@@ -35,6 +35,7 @@ def _kt_android_artifact(
         enable_data_binding = False,
         tags = [],
         exec_properties = None,
+        resource_files = None,
         **kwargs):
     """Delegates Android related build attributes to the native rules but uses the Kotlin builder to compile Java and
     Kotlin srcs. Returns a sequence of labels that a wrapping macro should export.
@@ -44,17 +45,47 @@ def _kt_android_artifact(
 
     # TODO(bazelbuild/rules_kotlin/issues/273): This should be retrieved from a provider.
     base_deps = [_ANDROID_SDK_JAR] + deps
+    base_tags = ['incompatible_compile_without_transitive_resources_deps'] + tags
 
-    _android_library(
-        name = base_name,
-        visibility = ["//visibility:private"],
-        exports = base_deps,
-        deps = deps if enable_data_binding else [],
-        enable_data_binding = enable_data_binding,
-        tags = tags,
-        exec_properties = exec_properties,
-        **kwargs
-    )
+    target_labels = [kt_name]
+    if 'kt_optimize_android_resources_incompatible' in tags:
+        # TODO(bazelbuild/rules_kotlin/issues/556): replace with starlark
+        # buildifier: disable=native-android
+        native.android_library(
+            name = base_name,
+            resource_files = resource_files,
+            exports = base_deps,
+            deps = deps if enable_data_binding else [],
+            enable_data_binding = enable_data_binding,
+            tags = base_tags,
+            visibility = ["//visibility:private"],
+            **kwargs
+        )
+        target_labels.append(base_name)
+    elif resource_files:
+        native.android_library(
+            name = base_name,
+            resource_files = resource_files,
+            deps = deps,
+            custom_package = kwargs.get("custom_package", default = None),
+            manifest = kwargs.get("manifest", default = None),
+            assets = kwargs.get("assets", default = None),
+            assets_dir = kwargs.get("assets_dir", default = None),
+            enable_data_binding = enable_data_binding,
+            tags = base_tags,
+            visibility = ["//visibility:private"],
+        )
+        target_labels.append(base_name)
+    else:
+        native.android_library(
+            name = base_name,
+            exports = deps,
+            enable_data_binding = enable_data_binding,
+            tags = base_tags,
+            visibility = ["//visibility:private"],
+            **kwargs
+        )
+
     _kt_jvm_library(
         name = kt_name,
         srcs = srcs,
@@ -69,7 +100,7 @@ def _kt_android_artifact(
         tags = tags,
         exec_properties = exec_properties,
     )
-    return [base_name, kt_name]
+    return target_labels
 
 def kt_android_library(name, exports = [], visibility = None, exec_properties = None, **kwargs):
     """Creates an Android sandwich library.

@@ -101,17 +101,12 @@ def _jvm_deps(toolchains, associated_targets, deps, runtime_deps = []):
             ",\n ".join(["    %s" % x for x in list(diff)]),
         )
     dep_infos = [_java_info(d) for d in associated_targets + deps] + [toolchains.kt.jvm_stdlibs]
+    transitive = [ d.compile_jars for d in dep_infos ]
+    if toolchains.kt.experimental_compile_with_transitive_deps:
+        transitive = transitive + [ d.transitive_compile_time_jars for d in dep_infos ]
     return struct(
         deps = dep_infos,
-        compile_jars = depset(
-            transitive = [
-                d.compile_jars
-                for d in dep_infos
-            ] + [
-                d.transitive_compile_time_jars
-                for d in dep_infos
-            ],
-        ),
+        compile_jars = depset(transitive = transitive),
         runtime_deps = [_java_info(d) for d in runtime_deps],
     )
 
@@ -312,6 +307,7 @@ def _run_kapt_builder_actions(
             "kapt_generated_class_jar": kapt_generated_class_jar,
         },
         build_kotlin = False,
+        build_using_kapt = True,
         mnemonic = "KotlinKapt",
     )
 
@@ -374,6 +370,7 @@ def _run_kt_builder_action(
         plugins,
         outputs,
         build_kotlin = True,
+        build_using_kapt = False,
         mnemonic = "KotlinCompile"):
     """Creates a KotlinBuilder action invocation."""
     kotlinc_options = ctx.attr.kotlinc_opts[KotlincOptions] if ctx.attr.kotlinc_opts else toolchains.kt.kotlinc_options
@@ -395,6 +392,7 @@ def _run_kt_builder_action(
     args.add_all("--deps_artifacts", deps_artifacts, omit_if_empty = True)
     args.add_all("--kotlin_friend_paths", associates.jars, map_each = _associate_utils.flatten_jars)
     args.add("--instrument_coverage", ctx.coverage_instrumented())
+    args.add("--track_class_usage", toolchains.kt.experimental_track_class_usage)
 
     # Collect and prepare plugin descriptor for the worker.
     args.add_all(
@@ -460,6 +458,7 @@ def _run_kt_builder_action(
     )
 
     args.add("--build_kotlin", build_kotlin)
+    args.add("--build_using_kapt", build_using_kapt)
 
     progress_message = "%s %%{label} { kt: %d, java: %d, srcjars: %d } for %s" % (
         mnemonic,
@@ -644,10 +643,12 @@ def _run_kt_java_builder_actions(
     compile_jars = []
     output_jars = []
     kt_stubs_for_java = []
+    ap_generated_src_jar = []
     has_kt_sources = srcs.kt or srcs.src_jars
+    use_javac_annotation_processor = "kt_use_javac_annotation_processor" in ctx.attr.tags
 
     # Run KAPT
-    if has_kt_sources and annotation_processors:
+    if not use_javac_annotation_processor and has_kt_sources and annotation_processors:
         kapt_outputs = _run_kapt_builder_actions(
             ctx,
             rule_kind = rule_kind,
@@ -717,17 +718,18 @@ def _run_kt_java_builder_actions(
             associates = associates,
             compile_deps = compile_deps,
             deps_artifacts = deps_artifacts,
-            annotation_processors = [],
+            annotation_processors = annotation_processors,
             transitive_runtime_jars = transitive_runtime_jars,
             plugins = plugins,
             outputs = outputs,
             build_kotlin = True,
+            build_using_kapt = False,
             mnemonic = "KotlinCompile",
         )
 
         compile_jars.append(kt_compile_jar)
         output_jars.append(kt_runtime_jar)
-        if not annotation_processors or not srcs.kt:
+        if use_javac_annotation_processor or not annotation_processors or not has_kt_sources:
             kt_stubs_for_java.append(JavaInfo(compile_jar = kt_compile_jar, output_jar = kt_runtime_jar, neverlink = True))
 
         kt_java_info = JavaInfo(
@@ -749,8 +751,14 @@ def _run_kt_java_builder_actions(
 
         # Kotlin takes care of annotation processing. Note that JavaBuilder "discovers"
         # annotation processors in `deps` also.
-        if len(srcs.kt) > 0:
-            javac_opts.append("-proc:none")
+        annotation_processor_additional_inputs = []
+        if has_kt_sources:
+            if not use_javac_annotation_processor:
+                javac_opts.append("-proc:none")
+            else:
+                javac_opts.append('-Xplugin:"Kaptish %s"' % kt_runtime_jar.path)
+                annotation_processor_additional_inputs = [kt_runtime_jar]
+
         java_info = java_common.compile(
             ctx,
             source_files = srcs.java,
@@ -762,6 +770,7 @@ def _run_kt_java_builder_actions(
             javac_opts = javac_opts,
             neverlink = getattr(ctx.attr, "neverlink", False),
             strict_deps = toolchains.kt.experimental_strict_kotlin_deps,
+            annotation_processor_additional_inputs = annotation_processor_additional_inputs,
         )
         ap_generated_src_jar = java_info.annotation_processing.source_jar
         compile_jars = compile_jars + [
