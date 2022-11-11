@@ -99,11 +99,13 @@ internal fun JvmCompilationTask.plugins(
 
     val optionTokens = mapOf(
       "{generatedClasses}" to directories.generatedClasses,
+      "{incrementalData}" to directories.incrementalData,
       "{stubs}" to directories.stubs,
       "{temp}" to directories.temp,
       "{generatedSources}" to directories.generatedSources,
-      "{classpath}" to classpath.joinToString(File.pathSeparator),
+      "{apclasspath}" to classpath.joinToString(File.pathSeparator),
     )
+
     options.forEach { opt ->
       val formatted = optionTokens.entries.fold(opt) { formatting, (token, value) ->
         formatting.replace(token, value)
@@ -227,18 +229,17 @@ internal fun JvmCompilationTask.runPlugins(
   plugins: InternalCompilerPlugins,
   compiler: KotlinToolchain.KotlincInvoker,
 ): JvmCompilationTask {
-  if (
-    (
-      inputs.processorsList.isEmpty() &&
-        inputs.stubsPluginClasspathList.isEmpty()
-      ) ||
+  if ((
+    inputs.processorsList.isEmpty() &&
+      inputs.stubsPluginClasspathList.isEmpty()
+    ) ||
     inputs.kotlinSourcesList.isEmpty()
   ) {
     return this
   } else {
     if (!outputs.generatedKspSrcJar.isNullOrEmpty()) {
       return runKspPlugin(context, plugins, compiler)
-    } else if (!outputs.generatedClassJar.isNullOrEmpty()) {
+    } else if (!outputs.generatedClassJar.isNullOrEmpty() && this.compileWithKapt) {
       return runKaptPlugin(context, plugins, compiler)
     } else {
       return this
