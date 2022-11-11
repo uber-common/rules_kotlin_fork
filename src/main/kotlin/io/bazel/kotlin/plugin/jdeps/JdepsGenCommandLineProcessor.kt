@@ -26,6 +26,10 @@ class JdepsGenCommandLineProcessor : CommandLineProcessor {
       )
     val STRICT_KOTLIN_DEPS_OPTION: CliOption =
       CliOption("strict_kotlin_deps", "<String>", "Report strict deps violations", required = true)
+    val TRACK_CLASS_USAGE_OPTION: CliOption =
+      CliOption("track_class_usage", "<String>", "Whether to track class usage", required = true)
+    val TRACK_RESOURCE_USAGE_OPTION: CliOption =
+      CliOption("track_resource_usage", "<String>", "Whether to track resource usage", required = true)
   }
 
   override val pluginId: String
@@ -37,6 +41,8 @@ class JdepsGenCommandLineProcessor : CommandLineProcessor {
         TARGET_LABEL_OPTION,
         DIRECT_DEPENDENCIES_OPTION,
         STRICT_KOTLIN_DEPS_OPTION,
+        TRACK_CLASS_USAGE_OPTION, 
+        TRACK_RESOURCE_USAGE_OPTION,
       )
 
   override fun processOption(
@@ -57,6 +63,15 @@ class JdepsGenCommandLineProcessor : CommandLineProcessor {
           JdepsGenConfigurationKeys.STRICT_KOTLIN_DEPS,
           value,
         )
+      TRACK_CLASS_USAGE_OPTION -> 
+        configuration.put(
+          JdepsGenConfigurationKeys.TRACK_CLASS_USAGE,
+          value,
+      )
+      TRACK_RESOURCE_USAGE_OPTION -> configuration.put(
+        JdepsGenConfigurationKeys.TRACK_RESOURCE_USAGE,
+        value,
+      )
       else -> throw CliOptionProcessingException("Unknown option: ${option.optionName}")
     }
   }

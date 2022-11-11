@@ -105,10 +105,11 @@ internal fun JvmCompilationTask.plugins(
     val optionTokens =
       mapOf(
         "{generatedClasses}" to directories.generatedClasses,
+        "{incrementalData}" to directories.incrementalData,
         "{stubs}" to directories.stubs,
         "{temp}" to directories.temp,
         "{generatedSources}" to directories.generatedSources,
-        "{classpath}" to classpath.joinToString(File.pathSeparator),
+        "{apclasspath}" to classpath.joinToString(File.pathSeparator),
       )
     options.forEach { opt ->
       val formatted =
@@ -248,7 +249,7 @@ internal fun JvmCompilationTask.runPlugins(
   } else {
     if (!outputs.generatedKspSrcJar.isNullOrEmpty()) {
       return runKspPlugin(context, plugins, compiler)
-    } else if (!outputs.generatedClassJar.isNullOrEmpty()) {
+    } else if (!outputs.generatedClassJar.isNullOrEmpty() && this.compileWithKapt) {
       return runKaptPlugin(context, plugins, compiler)
     } else {
       return this
