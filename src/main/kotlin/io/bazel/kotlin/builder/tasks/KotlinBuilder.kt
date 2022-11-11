@@ -83,10 +83,13 @@ class KotlinBuilder @Inject internal constructor(
       GENERATED_JAVA_STUB_JAR("--kapt_generated_stub_jar"),
       GENERATED_CLASS_JAR("--kapt_generated_class_jar"),
       BUILD_KOTLIN("--build_kotlin"),
+      BUILD_USING_KAPT("--build_using_kapt"),
       STRICT_KOTLIN_DEPS("--strict_kotlin_deps"),
       REDUCED_CLASSPATH_MODE("--reduced_classpath_mode"),
       INSTRUMENT_COVERAGE("--instrument_coverage"),
       KSP_GENERATED_JAVA_SRCJAR("--ksp_generated_java_srcjar"),
+      TRACK_CLASS_USAGE("--track_class_usage"),
+      TRACK_RESOURCE_USAGE("--track_resource_usage"),
     }
   }
 
@@ -160,6 +163,8 @@ class KotlinBuilder @Inject internal constructor(
         argMap.mandatorySingle(KotlinBuilderFlags.LANGUAGE_VERSION)
       strictKotlinDeps = argMap.mandatorySingle(KotlinBuilderFlags.STRICT_KOTLIN_DEPS)
       reducedClasspathMode = argMap.mandatorySingle(KotlinBuilderFlags.REDUCED_CLASSPATH_MODE)
+      trackClassUsage = argMap.mandatorySingle(KotlinBuilderFlags.TRACK_CLASS_USAGE)
+      trackResourceUsage = argMap.mandatorySingle(KotlinBuilderFlags.TRACK_RESOURCE_USAGE)
       this
     }
 
@@ -219,6 +224,7 @@ class KotlinBuilder @Inject internal constructor(
       root.info = info
 
       root.compileKotlin = argMap.mandatorySingle(KotlinBuilderFlags.BUILD_KOTLIN).toBoolean()
+      root.compileWithKapt = argMap.mandatorySingle(KotlinBuilderFlags.BUILD_USING_KAPT).toBoolean()
       root.instrumentCoverage = argMap.mandatorySingle(
         KotlinBuilderFlags.INSTRUMENT_COVERAGE,
       ).toBoolean()

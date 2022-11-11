@@ -63,6 +63,7 @@ class JdepsMerger {
       reportUnusedDeps: String,
     ): Int {
       val rootBuilder = Deps.Dependencies.newBuilder()
+      val usedResources = sortedSetOf<String>()
       rootBuilder.success = false
       rootBuilder.ruleLabel = label
 
@@ -72,15 +73,26 @@ class JdepsMerger {
           val deps: Deps.Dependencies = Deps.Dependencies.parseFrom(it)
           deps.getDependencyList().forEach {
             val dependency = dependencyMap.get(it.path)
-            // Replace dependency if it has a stronger kind than one we encountered before.
-            if (dependency == null || dependency.kind > it.kind) {
+            if (dependency != null) {
+              // Replace dependency if it has a stronger kind than one we encountered before, and
+              // merge used classes list.
+              if (dependency.kind > it.kind) {
+                dependencyMap.put(it.path, it.toBuilder().addAllUsedClasses(dependency.getUsedClassesList()).build())
+              } else {
+                dependencyMap.put(it.path, dependency.toBuilder().addAllUsedClasses(it.getUsedClassesList()).build())
+              }
+            } else {
               dependencyMap.put(it.path, it)
             }
+          }
+          deps.usedResourcesList.forEach { resource ->
+            usedResources.add(resource)
           }
         }
       }
 
       rootBuilder.addAllDependency(dependencyMap.values)
+      rootBuilder.addAllUsedResources(usedResources)
 
       rootBuilder.success = true
       rootBuilder.build().toByteArray()

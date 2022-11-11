@@ -82,6 +82,10 @@ message CompilationTaskInfo {
     string strict_kotlin_deps = 10;
     // Optimize classpath by removing dependencies not required for compilation
     string reduced_classpath_mode = 11;
+    // Whether to track used classes in .jdeps
+    string track_class_usage = 12;
+    // Whether to track used resources in .jdeps
+    string track_resource_usage = 13;
 }
 
 // Nested messages not marked with stable could be refactored.
@@ -166,6 +170,7 @@ message JvmCompilationTask {
   Inputs inputs = 4;
   bool compile_kotlin = 6;
   bool instrument_coverage = 7;
+  bool compile_with_kapt = 8;
 }
 
 message JsCompilationTask {

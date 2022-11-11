@@ -1,6 +1,8 @@
 package io.bazel.kotlin.plugin.jdeps
 
+import com.google.common.io.ByteStreams
 import com.google.devtools.build.lib.view.proto.Deps
+import com.google.protobuf.ByteString
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import io.bazel.kotlin.builder.utils.jars.JarOwner
@@ -20,6 +22,9 @@ import org.jetbrains.kotlin.descriptors.ValueDescriptor
 import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor
 import org.jetbrains.kotlin.extensions.StorageComponentContainerContributor
 import org.jetbrains.kotlin.load.java.descriptors.JavaClassConstructorDescriptor
+import org.jetbrains.kotlin.load.java.descriptors.JavaMethodDescriptor
+import org.jetbrains.kotlin.load.java.descriptors.JavaPropertyDescriptor
+import org.jetbrains.kotlin.load.java.lazy.descriptors.LazyJavaClassDescriptor
 import org.jetbrains.kotlin.load.java.sources.JavaSourceElement
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaClass
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaField
@@ -51,6 +56,11 @@ import org.jetbrains.kotlin.types.typeUtil.supertypes
 import java.io.BufferedOutputStream
 import java.io.File
 import java.nio.file.Paths
+import java.security.MessageDigest
+import java.util.*
+import java.util.jar.JarFile
+import java.util.stream.Collectors
+
 
 /**
  * Kotlin compiler extension that tracks classes (and corresponding classpath jars) needed to
@@ -134,10 +144,23 @@ class JdepsGenExtension(
         )
       }
     }
+
+    fun getResourceName(descriptor: DeclarationDescriptorWithSource): String? {
+      if (descriptor.containingDeclaration is LazyJavaClassDescriptor) {
+        val fqName: String? = (descriptor.containingDeclaration as LazyJavaClassDescriptor)?.jClass?.fqName?.asString()
+        if (fqName != null) {
+          if (fqName.indexOf(".R.") > 0 || fqName.indexOf("R.") == 0) {
+            return fqName + "." + descriptor.name.asString()
+          }
+        }
+      }
+      return null
+    }
   }
 
   private val explicitClassesCanonicalPaths = mutableSetOf<String>()
   private val implicitClassesCanonicalPaths = mutableSetOf<String>()
+  private val usedResources = mutableSetOf<String>()
 
   override fun registerModuleComponents(
     container: StorageComponentContainer,
@@ -145,13 +168,14 @@ class JdepsGenExtension(
     moduleDescriptor: ModuleDescriptor,
   ) {
     container.useInstance(
-      ClasspathCollectingChecker(explicitClassesCanonicalPaths, implicitClassesCanonicalPaths),
+      ClasspathCollectingChecker(explicitClassesCanonicalPaths, implicitClassesCanonicalPaths, usedResources),
     )
   }
 
   class ClasspathCollectingChecker(
     private val explicitClassesCanonicalPaths: MutableSet<String>,
     private val implicitClassesCanonicalPaths: MutableSet<String>,
+    private val usedResources: MutableSet<String>,
   ) : CallChecker, DeclarationChecker {
 
     override fun check(
@@ -382,6 +406,8 @@ class JdepsGenExtension(
     targetLabel: String,
     explicitDeps: Map<String, List<String>>,
   ) {
+    val trackClassUsage = configuration.getNotNull(JdepsGenConfigurationKeys.TRACK_CLASS_USAGE).equals("on")
+    val trackResourceUsage = configuration.getNotNull(JdepsGenConfigurationKeys.TRACK_RESOURCE_USAGE).equals("on")
     val implicitDeps = createDepsMap(implicitClassesCanonicalPaths)
 
     // Build and write out deps.proto
@@ -392,30 +418,65 @@ class JdepsGenExtension(
     rootBuilder.ruleLabel = targetLabel
 
     val unusedDeps = directDeps.subtract(explicitDeps.keys)
-    unusedDeps.forEach { jarPath ->
+    unusedDeps.sorted().forEach { jarPath ->
       val dependency = Deps.Dependency.newBuilder()
       dependency.kind = Deps.Dependency.Kind.UNUSED
       dependency.path = jarPath
       rootBuilder.addDependency(dependency)
     }
 
-    explicitDeps.forEach { (jarPath, _) ->
+    explicitDeps.toSortedMap().forEach { (jarPath, usedClasses) ->
       val dependency = Deps.Dependency.newBuilder()
       dependency.kind = Deps.Dependency.Kind.EXPLICIT
       dependency.path = jarPath
+
+      if (trackClassUsage) {
+        // Add tracked classes and their (compile time) hash into final output, as needed for
+        // compilation avoidance.
+        usedClasses.stream().sorted().collect(Collectors.toList()).forEach { it ->
+          val name = it.replace(".class", "").replace("/", ".")
+          val hash = ByteString.copyFrom(getHashFromJarEntry(jarPath, it))
+          val usedClass: Deps.UsedClass = Deps.UsedClass.newBuilder()
+            .setFullyQualifiedName(name)
+            .setInternalPath(it)
+            .setHash(hash)
+            .build()
+          dependency.addUsedClasses(usedClass)
+        }
+      }
+
       rootBuilder.addDependency(dependency)
     }
 
-    implicitDeps.keys.subtract(explicitDeps.keys).forEach {
+    implicitDeps.keys.subtract(explicitDeps.keys).sorted().forEach {
       val dependency = Deps.Dependency.newBuilder()
       dependency.kind = Deps.Dependency.Kind.IMPLICIT
       dependency.path = it
       rootBuilder.addDependency(dependency)
     }
 
+    if (trackResourceUsage) {
+      usedResources.sorted().forEach { resource ->
+        rootBuilder.addUsedResources(resource)
+      }
+    }
+
     BufferedOutputStream(File(jdepsOutput).outputStream()).use {
       it.write(rootBuilder.build().toByteArray())
     }
+  }
+
+  /**
+   * Compute hash of internal jar class ABI definition.
+   */
+  private fun getHashFromJarEntry(
+    jarPath: String,
+    internalPath: String,
+  ): ByteArray {
+    val jarFile = JarFile(jarPath)
+    val entry = jarFile.getEntry(internalPath)
+    val bytes = ByteStreams.toByteArray(jarFile.getInputStream(entry))
+    return MessageDigest.getInstance("SHA-256").digest(bytes)
   }
 
   private fun doStrictDeps(
