@@ -44,6 +44,7 @@ def _kt_android_artifact(
 
     # TODO(bazelbuild/rules_kotlin/issues/273): This should be retrieved from a provider.
     base_deps = [_ANDROID_SDK_JAR] + deps
+    base_tags = ['incompatible_compile_without_transitive_resources_deps'] + tags
 
     _android_library(
         name = base_name,
@@ -55,6 +56,7 @@ def _kt_android_artifact(
         exec_properties = exec_properties,
         **kwargs
     )
+
     _kt_jvm_library(
         name = kt_name,
         srcs = srcs,
@@ -69,7 +71,7 @@ def _kt_android_artifact(
         tags = tags,
         exec_properties = exec_properties,
     )
-    return [base_name, kt_name]
+    return [kt_name]
 
 def kt_android_library(name, exports = [], visibility = None, exec_properties = None, **kwargs):
     """Creates an Android sandwich library.

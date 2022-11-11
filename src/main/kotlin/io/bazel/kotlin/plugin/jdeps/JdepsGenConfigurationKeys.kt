@@ -29,7 +29,11 @@ object JdepsGenConfigurationKeys {
    * List of direct dependencies of the target.
    */
   val DIRECT_DEPENDENCIES: CompilerConfigurationKey<List<String>> =
-    CompilerConfigurationKey.create(
-      JdepsGenCommandLineProcessor.DIRECT_DEPENDENCIES_OPTION.description,
-    )
+    CompilerConfigurationKey.create(JdepsGenCommandLineProcessor.DIRECT_DEPENDENCIES_OPTION.description)
+
+  /**
+   * Whether used class tracking is enabled or not.
+   */
+  val TRACK_CLASS_USAGE: CompilerConfigurationKey<String> =
+    CompilerConfigurationKey.create(JdepsGenCommandLineProcessor.TRACK_CLASS_USAGE_OPTION.description)
 }
