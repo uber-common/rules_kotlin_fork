@@ -108,12 +108,21 @@ class PersistentWorker(
   private fun TaskResult.asResponseTo(id: Int, io: IO): WorkResponse {
     return WorkResponse.newBuilder()
       .apply {
-        val cap = io.readCapturedAsUtf8String()
         // append whatever falls through standard out.
-        output = listOf(
-          log.out.toString(),
-          cap,
-        ).joinToString("\n").trim()
+        val outputLines = (
+          log.out.toString().splitToSequence("\n") +
+            io.readCapturedAsUtf8String().splitToSequence("\n")
+          )
+        output = outputLines
+          .asSequence()
+          .filter { it.isNotBlank() }
+          .filterNot {
+            it.contains("[ksp] loaded provider(s): ") ||
+            it.contains("[ksp] No dependencies reported for generated source") ||
+            it.contains("Please file a bug at https://issuetracker.google.com/issues/new?component=413107")
+          }
+          .joinToString("\n")
+          .trim()
         exitCode = status.exit
         requestId = id
       }
