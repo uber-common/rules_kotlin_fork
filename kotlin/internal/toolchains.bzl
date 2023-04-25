@@ -89,6 +89,7 @@ def _kotlin_toolchain_impl(ctx):
         experimental_reduce_classpath_mode = ctx.attr.experimental_reduce_classpath_mode,
         experimental_compile_with_transitive_deps = ctx.attr.experimental_compile_with_transitive_deps,
         experimental_track_class_usage = ctx.attr.experimental_track_class_usage,
+        experimental_track_resource_usage = ctx.attr.experimental_track_resource_usage,
         javac_options = ctx.attr.javac_options[JavacOptions] if ctx.attr.javac_options else None,
         kotlinc_options = ctx.attr.kotlinc_options[KotlincOptions] if ctx.attr.kotlinc_options else None,
         empty_jar = ctx.file._empty_jar,
@@ -251,6 +252,14 @@ _kt_toolchain = rule(
                 "on",
             ],
         ),
+        "experimental_track_resource_usage": attr.string(
+            doc = "Whether to track used resources",
+            default = "off",
+            values = [
+                "off",
+                "on",
+            ],
+        ),
         "experimental_compile_with_transitive_deps": attr.bool(
             doc = "Compile with or without transitive dependencies from the classpath",
             default = True,
@@ -319,6 +328,7 @@ def define_kt_toolchain(
         experimental_report_unused_deps = None,
         experimental_reduce_classpath_mode = None,
         experimental_track_class_usage = None,
+        experimental_track_resource_usage = None,
         experimental_compile_with_transitive_deps = True,
         experimental_multiplex_workers = None,
         javac_options = Label("//kotlin/internal:default_javac_options"),
@@ -343,6 +353,7 @@ def define_kt_toolchain(
         experimental_report_unused_deps = experimental_report_unused_deps,
         experimental_reduce_classpath_mode = experimental_reduce_classpath_mode,
         experimental_track_class_usage = experimental_track_class_usage,
+        experimental_track_resource_usage = experimental_track_resource_usage,
         experimental_compile_with_transitive_deps = experimental_compile_with_transitive_deps,
         javac_options = javac_options,
         kotlinc_options = kotlinc_options,

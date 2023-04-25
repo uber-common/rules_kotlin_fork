@@ -84,6 +84,8 @@ message CompilationTaskInfo {
     string reduced_classpath_mode = 11;
     // Whether to track used classes in .jdeps
     string track_class_usage = 12;
+    // Whether to track used resources in .jdeps
+    string track_resource_usage = 13;
 }
 
 // Nested messages not marked with stable could be refactored.
