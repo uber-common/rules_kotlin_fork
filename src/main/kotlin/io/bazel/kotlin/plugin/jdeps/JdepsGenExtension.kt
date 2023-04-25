@@ -23,6 +23,7 @@ import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor
 import org.jetbrains.kotlin.extensions.StorageComponentContainerContributor
 import org.jetbrains.kotlin.load.java.descriptors.JavaMethodDescriptor
 import org.jetbrains.kotlin.load.java.descriptors.JavaPropertyDescriptor
+import org.jetbrains.kotlin.load.java.lazy.descriptors.LazyJavaClassDescriptor
 import org.jetbrains.kotlin.load.java.sources.JavaSourceElement
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaClass
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaField
@@ -112,10 +113,21 @@ class JdepsGenExtension(
         )
       }
     }
+
+    fun getResourceName(descriptor: DeclarationDescriptorWithSource): String? {
+      val fqName: String? = ((descriptor.containingDeclaration as ClassDescriptor) as LazyJavaClassDescriptor)?.jClass?.fqName?.asString()
+      if (fqName != null) {
+        if (fqName.indexOf(".R.") > 0 || fqName.indexOf("R.") == 0) {
+          return fqName + "." + descriptor.name.asString()
+        }
+      }
+      return null
+    }
   }
 
   private val explicitClassesCanonicalPaths = mutableSetOf<String>()
   private val implicitClassesCanonicalPaths = mutableSetOf<String>()
+  private val usedResources = mutableSetOf<String>()
 
   override fun registerModuleComponents(
     container: StorageComponentContainer,
@@ -123,13 +135,14 @@ class JdepsGenExtension(
     moduleDescriptor: ModuleDescriptor,
   ) {
     container.useInstance(
-      ClasspathCollectingChecker(explicitClassesCanonicalPaths, implicitClassesCanonicalPaths),
+      ClasspathCollectingChecker(explicitClassesCanonicalPaths, implicitClassesCanonicalPaths, usedResources),
     )
   }
 
   class ClasspathCollectingChecker(
     private val explicitClassesCanonicalPaths: MutableSet<String>,
     private val implicitClassesCanonicalPaths: MutableSet<String>,
+    private val usedResources: MutableSet<String>,
   ) : CallChecker, DeclarationChecker {
 
     override fun check(
@@ -167,6 +180,7 @@ class JdepsGenExtension(
         }
         is JavaPropertyDescriptor -> {
           getClassCanonicalPath(resultingDescriptor)?.let { explicitClassesCanonicalPaths.add(it) }
+          getResourceName(resultingDescriptor)?.let { usedResources.add(it) }
         }
         is PropertyDescriptor -> {
           when (resultingDescriptor.containingDeclaration) {
@@ -358,6 +372,10 @@ class JdepsGenExtension(
       dependency.kind = Deps.Dependency.Kind.IMPLICIT
       dependency.path = it
       rootBuilder.addDependency(dependency)
+    }
+
+    usedResources.sorted().forEach { resource ->
+      rootBuilder.addUsedResources(resource)
     }
 
     BufferedOutputStream(File(jdepsOutput).outputStream()).use {
