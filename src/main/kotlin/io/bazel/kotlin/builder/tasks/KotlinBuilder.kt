@@ -89,6 +89,7 @@ class KotlinBuilder @Inject internal constructor(
       INSTRUMENT_COVERAGE("--instrument_coverage"),
       KSP_GENERATED_JAVA_SRCJAR("--ksp_generated_java_srcjar"),
       TRACK_CLASS_USAGE("--track_class_usage"),
+      TRACK_RESOURCE_USAGE("--track_resource_usage"),
     }
   }
 
@@ -163,6 +164,7 @@ class KotlinBuilder @Inject internal constructor(
       strictKotlinDeps = argMap.mandatorySingle(KotlinBuilderFlags.STRICT_KOTLIN_DEPS)
       reducedClasspathMode = argMap.mandatorySingle(KotlinBuilderFlags.REDUCED_CLASSPATH_MODE)
       trackClassUsage = argMap.mandatorySingle(KotlinBuilderFlags.TRACK_CLASS_USAGE)
+      trackResourceUsage = argMap.mandatorySingle(KotlinBuilderFlags.TRACK_RESOURCE_USAGE)
       this
     }
 
