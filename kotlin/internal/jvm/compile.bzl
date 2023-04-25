@@ -482,6 +482,7 @@ def _run_kt_builder_action(
     args.add_all("--kotlin_friend_paths", associates.jars, map_each = _associate_utils.flatten_jars)
     args.add("--instrument_coverage", ctx.coverage_instrumented())
     args.add("--track_class_usage", toolchains.kt.experimental_track_class_usage)
+    args.add("--track_resource_usage", toolchains.kt.experimental_track_resource_usage)
 
     # Collect and prepare plugin descriptor for the worker.
     args.add_all(

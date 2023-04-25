@@ -403,6 +403,7 @@ class JdepsGenExtension(
     explicitDeps: Map<String, List<String>>,
   ) {
     val trackClassUsage = configuration.getNotNull(JdepsGenConfigurationKeys.TRACK_CLASS_USAGE).equals("on")
+    val trackResourceUsage = configuration.getNotNull(JdepsGenConfigurationKeys.TRACK_RESOURCE_USAGE).equals("on")
     val implicitDeps = createDepsMap(implicitClassesCanonicalPaths)
 
     // Build and write out deps.proto
@@ -450,8 +451,10 @@ class JdepsGenExtension(
       rootBuilder.addDependency(dependency)
     }
 
-    usedResources.sorted().forEach { resource ->
-      rootBuilder.addUsedResources(resource)
+    if (trackResourceUsage) {
+      usedResources.sorted().forEach { resource ->
+        rootBuilder.addUsedResources(resource)
+      }
     }
 
     BufferedOutputStream(File(jdepsOutput).outputStream()).use {
