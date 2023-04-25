@@ -63,6 +63,7 @@ class JdepsMerger {
       reportUnusedDeps: String,
     ): Int {
       val rootBuilder = Deps.Dependencies.newBuilder()
+      val usedResources = mutableSetOf<String>()
       rootBuilder.success = false
       rootBuilder.ruleLabel = label
 
@@ -84,10 +85,14 @@ class JdepsMerger {
               dependencyMap.put(it.path, it)
             }
           }
+          deps.usedResourcesList.forEach { resource ->
+            usedResources.add(resource)
+          }
         }
       }
 
       rootBuilder.addAllDependency(dependencyMap.values)
+      rootBuilder.addAllUsedResources(usedResources.sorted())
 
       rootBuilder.success = true
       rootBuilder.build().toByteArray()
