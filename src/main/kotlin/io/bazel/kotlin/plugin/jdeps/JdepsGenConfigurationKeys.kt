@@ -36,4 +36,10 @@ object JdepsGenConfigurationKeys {
    */
   val TRACK_CLASS_USAGE: CompilerConfigurationKey<String> =
     CompilerConfigurationKey.create(JdepsGenCommandLineProcessor.TRACK_CLASS_USAGE_OPTION.description)
+
+  /**
+   * Whether used resource tracking is enabled or not.
+   */
+  val TRACK_RESOURCE_USAGE: CompilerConfigurationKey<String> =
+    CompilerConfigurationKey.create(JdepsGenCommandLineProcessor.TRACK_RESOURCE_USAGE_OPTION.description)
 }
