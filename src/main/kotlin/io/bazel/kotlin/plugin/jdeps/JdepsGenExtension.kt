@@ -115,10 +115,12 @@ class JdepsGenExtension(
     }
 
     fun getResourceName(descriptor: DeclarationDescriptorWithSource): String? {
-      val fqName: String? = ((descriptor.containingDeclaration as ClassDescriptor) as LazyJavaClassDescriptor)?.jClass?.fqName?.asString()
-      if (fqName != null) {
-        if (fqName.indexOf(".R.") > 0 || fqName.indexOf("R.") == 0) {
-          return fqName + "." + descriptor.name.asString()
+      if (descriptor.containingDeclaration is LazyJavaClassDescriptor) {
+        val fqName: String? = (descriptor.containingDeclaration as LazyJavaClassDescriptor)?.jClass?.fqName?.asString()
+        if (fqName != null) {
+          if (fqName.indexOf(".R.") > 0 || fqName.indexOf("R.") == 0) {
+            return fqName + "." + descriptor.name.asString()
+          }
         }
       }
       return null
