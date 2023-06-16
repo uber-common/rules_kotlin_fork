@@ -1,8 +1,8 @@
 package io.bazel.kotlin.plugin.jdeps
 
 import com.google.common.io.ByteStreams
-import com.google.protobuf.ByteString
 import com.google.devtools.build.lib.view.proto.Deps
+import com.google.protobuf.ByteString
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import io.bazel.kotlin.builder.utils.jars.JarOwner
@@ -48,8 +48,10 @@ import org.jetbrains.kotlin.types.typeUtil.supertypes
 import java.io.BufferedOutputStream
 import java.io.File
 import java.nio.file.Paths
-import java.util.jar.JarFile
 import java.security.MessageDigest
+import java.util.*
+import java.util.jar.JarFile
+import java.util.stream.Collectors
 
 
 /**
@@ -353,7 +355,7 @@ class JdepsGenExtension(
       if (trackClassUsage) {
         // Add tracked classes and their (compile time) hash into final output, as needed for
         // compilation avoidance.
-        usedClasses.forEach { it ->
+        usedClasses.stream().sorted().collect(Collectors.toList()).forEach { it ->
           val name = it.replace(".class", "").replace("/", ".")
           val hash = ByteString.copyFrom(getHashFromJarEntry(jarPath, it))
           val usedClass: Deps.UsedClass = Deps.UsedClass.newBuilder()
@@ -391,7 +393,7 @@ class JdepsGenExtension(
    */
   private fun getHashFromJarEntry(
     jarPath: String,
-    internalPath: String
+    internalPath: String,
   ): ByteArray {
     val jarFile = JarFile(jarPath)
     val entry = jarFile.getEntry(internalPath)
