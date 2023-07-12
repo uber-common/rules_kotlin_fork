@@ -14,14 +14,8 @@
 load(
     "//kotlin/internal/jvm:compile.bzl",
     "export_only_providers",
-    _compiler_toolchains = "compiler_toolchains_exposed",
-    _get_kt_dep_infos = "get_kt_dep_infos",
-    _jvm_deps = "jvm_deps_exposed",
+    _compile = "compile",
     _kt_jvm_produce_output_jar_actions = "kt_jvm_produce_output_jar_actions",
-)
-load(
-    "//kotlin/internal/jvm:associates.bzl",
-    _associate_utils = "associate_utils",
 )
 load("@rules_android//rules:java.bzl", _java = "java")
 load("@rules_android//rules:processing_pipeline.bzl", _ProviderInfo = "ProviderInfo", _processing_pipeline = "processing_pipeline")
@@ -115,16 +109,25 @@ def kt_android_produce_jar_actions(
     Returns:
         see `kt_jvm_compile_action`.
     """
-    toolchains = _compiler_toolchains(ctx)
-    associates = _associate_utils.get_associates(ctx)
+    deps = getattr(ctx.attr, "deps", [])
+    associates = getattr(ctx.attr, "associates", [])
+    runtime_deps = getattr(ctx.attr, "runtime_deps", [])
+    _compile.verify_associates_not_duplicated_in_deps(deps = deps, associates = associates)
 
     # Collect the android compile dependencies
     android_dep_infos = [_get_android_sdk_jar(ctx)]
     if rClass:
         android_dep_infos.append(rClass)
-    android_dep_infos.extend(_get_android_resource_class_jars(ctx.attr.deps + ctx.attr.associates))
-    android_dep_infos.extend(_get_kt_dep_infos(toolchains, associates.targets, deps = ctx.attr.deps))
-    compile_deps = _jvm_deps(ctx, android_dep_infos, ctx.attr.runtime_deps)
+    android_dep_infos.extend(_get_android_resource_class_jars(deps + associates + runtime_deps))
+    android_dep_infos.extend([_compile.java_info(d) for d in deps])
+
+    compile_deps = _compile.jvm_deps(
+        ctx,
+        toolchains = _compile.compiler_toolchains(ctx),
+        deps = android_dep_infos,
+        associates = [_compile.java_info(d) for d in associates],
+        runtime_deps = [_compile.java_info(d) for d in runtime_deps],
+    )
 
     # Setup the compile action.
     return _kt_jvm_produce_output_jar_actions(
