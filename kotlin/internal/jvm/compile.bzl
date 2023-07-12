@@ -119,10 +119,10 @@ def _compiler_friends(ctx, friends):
     else:
         fail("only one friend is possible")
 
-def get_kt_dep_infos(toolchains, associated_targets, deps):
+def _verify_associates_not_duplicated_in_deps(associates, deps):
     """Encapsulates jvm dependency metadata."""
     diff = _sets.intersection(
-        _sets.copy_of([x.label for x in associated_targets]),
+        _sets.copy_of([x.label for x in associates]),
         _sets.copy_of([x.label for x in deps]),
     )
     if diff:
@@ -130,19 +130,20 @@ def get_kt_dep_infos(toolchains, associated_targets, deps):
             "\n------\nTargets should only be put in associates= or deps=, not both:\n%s" %
             ",\n ".join(["    %s" % x for x in list(diff)]),
         )
-    dep_infos = [_java_info(d) for d in associated_targets + deps] + [toolchains.kt.jvm_stdlibs]
-    return dep_infos
 
-def _jvm_deps(ctx, dep_infos, runtime_deps = []):
+def _jvm_deps(ctx, toolchains, deps, associates, runtime_deps = []):
+    dep_infos = (deps + associates + [toolchains.kt.jvm_stdlibs])
+
     # Reduced classpath, exclude transitive deps from compilation
-    toolchains = _compiler_toolchains(ctx)
     if (toolchains.kt.experimental_prune_transitive_deps and
         not "kt_experimental_prune_transitive_deps_incompatible" in ctx.attr.tags) or not toolchains.kt.experimental_compile_with_transitive_deps:
+        transitive_jars = []
         transitive = [
             d.compile_jars
             for d in dep_infos
         ]
     else:
+        transitive_jars = []
         transitive = [
             d.compile_jars
             for d in dep_infos
@@ -153,10 +154,9 @@ def _jvm_deps(ctx, dep_infos, runtime_deps = []):
 
     return struct(
         deps = dep_infos,
-        compile_jars = depset(
-            transitive = transitive,
-        ),
-        runtime_deps = [_java_info(d) for d in runtime_deps],
+        provided_deps = dep_infos,
+        compile_jars = depset(transitive_jars, transitive = transitive),
+        runtime_deps = runtime_deps,
     )
 
 def _java_infos_to_compile_jars(java_infos):
@@ -623,13 +623,17 @@ def kt_jvm_produce_jar_actions(ctx, rule_kind, extra_resources = {}):
     Returns:
         see `kt_jvm_compile_action`.
     """
+    deps = getattr(ctx.attr, "deps", [])
+    associates = getattr(ctx.attr, "associates", [])
+    runtime_deps = getattr(ctx.attr, "runtime_deps", [])
+    _verify_associates_not_duplicated_in_deps(deps = deps, associates = associates)
 
-    toolchains = _compiler_toolchains(ctx)
-    associates = _associate_utils.get_associates(ctx)
-    dep_infos = get_kt_dep_infos(
-        toolchains,
-        associates.targets,
-        deps = ctx.attr.deps,
+    dep_infos = _jvm_deps(
+        ctx,
+        toolchains = _compiler_toolchains(ctx),
+        deps = [_java_info(d) for d in deps],
+        associates = [_java_info(d) for d in associates],
+        runtime_deps = [_java_info(d) for d in runtime_deps],
     )
 
     outputs = struct(
@@ -641,7 +645,7 @@ def kt_jvm_produce_jar_actions(ctx, rule_kind, extra_resources = {}):
     return kt_jvm_produce_output_jar_actions(
         ctx,
         rule_kind = rule_kind,
-        compile_deps = _jvm_deps(ctx, dep_infos, ctx.attr.runtime_deps),
+        compile_deps = dep_infos,
         outputs = outputs,
         extra_resources = extra_resources,
     )
@@ -729,7 +733,7 @@ def kt_jvm_produce_output_jar_actions(
         compile_jar = compile_jar,
         source_jar = source_jar,
         jdeps = output_jdeps,
-        deps = compile_deps.deps,
+        deps = compile_deps.provided_deps,
         runtime_deps = [_java_info(d) for d in ctx.attr.runtime_deps],
         exports = [_java_info(d) for d in getattr(ctx.attr, "exports", [])],
         neverlink = getattr(ctx.attr, "neverlink", False),
@@ -1058,9 +1062,10 @@ def export_only_providers(ctx, actions, attr, outputs):
         ),
     )
 
-#
-# Exposed for kt_android_* rules
-#
-jvm_deps_exposed = _jvm_deps
-compiler_friends_exposed = _compiler_friends
-compiler_toolchains_exposed = _compiler_toolchains
+compile = struct(
+    jvm_deps = _jvm_deps,
+    java_info = _java_info,
+    compiler_friends = _compiler_friends,
+    compiler_toolchains = _compiler_toolchains,
+    verify_associates_not_duplicated_in_deps = _verify_associates_not_duplicated_in_deps,
+)
