@@ -7,9 +7,6 @@ build --strategy=KotlinCompile=worker
 build --test_output=all
 build --verbose_failures
 
-# User-specific .bazelrc
-try-import %workspace%/user.bazelrc
-
 # Expose (not really) experimental Android providers need by rules_android-
 # AndroidLibraryResourceClassJarProvider, AndroidIdeInfo, ...
 # The following common and build flags are required for the
@@ -21,3 +18,6 @@ common \
 build \
   --android_databinding_use_v3_4_args \
   --experimental_android_databinding_v2
+
+# User-specific .bazelrc
+try-import %workspace%/user.bazelrc
