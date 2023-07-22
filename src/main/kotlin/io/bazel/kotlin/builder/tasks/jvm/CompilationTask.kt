@@ -27,6 +27,7 @@ import io.bazel.kotlin.builder.utils.IS_JVM_SOURCE_FILE
 import io.bazel.kotlin.builder.utils.bazelRuleKind
 import io.bazel.kotlin.builder.utils.jars.JarCreator
 import io.bazel.kotlin.builder.utils.jars.JarHelper.Companion.MANIFEST_DIR
+import io.bazel.kotlin.builder.utils.jars.JarHelper.Companion.SERVICES_DIR
 import io.bazel.kotlin.builder.utils.jars.SourceJarExtractor
 import io.bazel.kotlin.builder.utils.partitionJvmSources
 import io.bazel.kotlin.model.JvmCompilationTask
@@ -455,7 +456,7 @@ internal fun JvmCompilationTask.expandWithSourceJarSources(): JvmCompilationTask
     expandWithSources(
       SourceJarExtractor(
         destDir = Paths.get(directories.temp).resolve(SOURCE_JARS_DIR),
-        fileMatcher = { str: String -> IS_JVM_SOURCE_FILE.test(str) || "/$MANIFEST_DIR" in str },
+        fileMatcher = { str: String -> IS_JVM_SOURCE_FILE.test(str) || "/$MANIFEST_DIR" in str || "/$SERVICES_DIR" in str },
       ).also {
         it.jarFiles.addAll(inputs.sourceJarsList.map { p -> Paths.get(p) })
         it.execute()
@@ -517,7 +518,7 @@ internal fun Iterator<String>.copyManifestFilesToGeneratedClasses(
 ): Iterator<String> {
   val result = mutableSetOf<String>()
   this.forEach {
-    if ("/$MANIFEST_DIR" in it) {
+    if ("/$MANIFEST_DIR" in it || "/$SERVICES_DIR" in it) {
       val path = Paths.get(it)
       val srcJarsPath = Paths.get(directories.temp, SOURCE_JARS_DIR)
       if (srcJarsPath.exists()) {
