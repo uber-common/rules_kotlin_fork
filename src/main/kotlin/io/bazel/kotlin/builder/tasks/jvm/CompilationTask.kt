@@ -456,7 +456,7 @@ internal fun JvmCompilationTask.expandWithSourceJarSources(): JvmCompilationTask
     expandWithSources(
       SourceJarExtractor(
         destDir = Paths.get(directories.temp).resolve(SOURCE_JARS_DIR),
-        fileMatcher = { str: String -> IS_JVM_SOURCE_FILE.test(str) || "/$MANIFEST_DIR" in str || "/$SERVICES_DIR" in str },
+        fileMatcher = { str: String -> IS_JVM_SOURCE_FILE.test(str) || ("/$MANIFEST_DIR" in str && !("MANIFEST.MF" in str)) || "/$SERVICES_DIR" in str },
       ).also {
         it.jarFiles.addAll(inputs.sourceJarsList.map { p -> Paths.get(p) })
         it.execute()
