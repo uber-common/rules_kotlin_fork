@@ -75,10 +75,18 @@ def _builder_workspace_name(ctx):
         lbl = ctx.workspace_name
     return lbl.replace("external/", "")
 
+def _dic_to_flag_list(dic):
+    """Converts a dictionary to a list of flags."""
+    flags = []
+    for key, value in dic.items():
+        flags.append(key + "=" + value)
+    return flags
+
 utils = struct(
     add_dicts = _add_dicts,
     init_args = _init_builder_args,
     restore_label = _restore_label,
     derive_module_name = _derive_module_name,
     builder_workspace_name = _builder_workspace_name,
+    dic_to_flag_list = _dic_to_flag_list,
 )
