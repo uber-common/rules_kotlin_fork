@@ -216,6 +216,10 @@ internal fun JvmCompilationTask.kspArgs(
           flag(pair.first, value)
         }
       }
+
+      info.kspOptsList.forEach { flag ->
+        flag("apoption", flag)
+      }
     }
   }
 }
