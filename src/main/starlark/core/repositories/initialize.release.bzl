@@ -74,9 +74,8 @@ def kotlin_repositories(
     maybe(
         http_archive,
         name = "rules_android",
-        sha256 = versions.ANDROID.SHA,
-        strip_prefix = "rules_android-%s" % versions.ANDROID.VERSION,
-        urls = versions.ANDROID.URLS,
+        sha256 = versions.ANDROID.sha256,
+        urls = [url.format(version = versions.ANDROID.version) for url in versions.ANDROID.url_templates],
     )
 
     if is_bzlmod:
