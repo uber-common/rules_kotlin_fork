@@ -95,7 +95,31 @@ def _compiler_toolchains(ctx):
         java_runtime = find_java_runtime_toolchain(ctx, ctx.attr._host_javabase),
     )
 
-def _jvm_deps(ctx, toolchains, associated_targets, deps, runtime_deps = []):
+def _compiler_friends(ctx, friends):
+    """Creates a struct of friends meta data"""
+
+    # TODO extract and move this into common. Need to make it generic first.
+    if len(friends) == 0:
+        return struct(
+            targets = [],
+            module_name = _utils.derive_module_name(ctx),
+            paths = [],
+        )
+    elif len(friends) == 1:
+        if friends[0][_KtJvmInfo] == None:
+            fail("only kotlin dependencies can be friends")
+        elif ctx.attr.module_name:
+            fail("if friends has been set then module_name cannot be provided")
+        else:
+            return struct(
+                targets = friends,
+                paths = _java_info(friends[0]).compile_jars,
+                module_name = friends[0][_KtJvmInfo].module_name,
+            )
+    else:
+        fail("only one friend is possible")
+
+def get_kt_dep_infos(toolchains, associated_targets, deps):
     """Encapsulates jvm dependency metadata."""
     diff = _sets.intersection(
         _sets.copy_of([x.label for x in associated_targets]),
@@ -107,8 +131,11 @@ def _jvm_deps(ctx, toolchains, associated_targets, deps, runtime_deps = []):
             ",\n ".join(["    %s" % x for x in list(diff)]),
         )
     dep_infos = [_java_info(d) for d in associated_targets + deps] + [toolchains.kt.jvm_stdlibs]
+    return dep_infos
 
+def _jvm_deps(ctx, dep_infos, runtime_deps = []):
     # Reduced classpath, exclude transitive deps from compilation
+    toolchains = _compiler_toolchains(ctx)
     if (toolchains.kt.experimental_prune_transitive_deps and
         not "kt_experimental_prune_transitive_deps_incompatible" in ctx.attr.tags) or not toolchains.kt.experimental_compile_with_transitive_deps:
         transitive = [
@@ -287,9 +314,10 @@ def _fold_jars_action(ctx, rule_kind, toolchains, output_jar, input_jars, action
             "" if not action_type else " (%s)" % action_type,
             len(input_jars),
         ),
+        toolchain = None,
     )
 
-def _resourcejar_args_action(ctx):
+def _resourcejar_args_action(ctx, extra_resources = {}):
     res_cmd = []
     for f in ctx.files.resources:
         target_path = _adjust_resources_path(f.short_path, ctx.attr.resource_strip_prefix)
@@ -300,20 +328,31 @@ def _resourcejar_args_action(ctx):
             f_path = f.path,
         )
         res_cmd.extend([line])
+
+    for key, value in extra_resources.items():
+        target_path = _adjust_resources_path(value.short_path, ctx.label.package)
+        if target_path[0] == "/":
+            target_path = target_path[1:]
+        line = "{target_path}={res_path}\n".format(
+            res_path = value.path,
+            target_path = key,
+        )
+        res_cmd.extend([line])
+
     zipper_args_file = ctx.actions.declare_file("%s_resources_zipper_args" % ctx.label.name)
     ctx.actions.write(zipper_args_file, "".join(res_cmd))
     return zipper_args_file
 
-def _build_resourcejar_action(ctx):
+def _build_resourcejar_action(ctx, extra_resources = {}):
     """sets up an action to build a resource jar for the target being compiled.
     Returns:
         The file resource jar file.
     """
     resources_jar_output = ctx.actions.declare_file(ctx.label.name + "-resources.jar")
-    zipper_args = _resourcejar_args_action(ctx)
+    zipper_args = _resourcejar_args_action(ctx, extra_resources)
     ctx.actions.run_shell(
         mnemonic = "KotlinZipResourceJar",
-        inputs = ctx.files.resources + [zipper_args],
+        inputs = ctx.files.resources + extra_resources.values() + [zipper_args],
         tools = [ctx.executable._zipper],
         outputs = [resources_jar_output],
         command = "{zipper} c {resources_jar_output} @{path}".format(
@@ -357,6 +396,7 @@ def _run_merge_jdeps_action(ctx, toolchains, jdeps, outputs, deps):
         execution_requirements = toolchains.kt.execution_requirements,
         arguments = [args],
         progress_message = progress_message,
+        toolchain = None,
     )
 
 def _run_kapt_builder_actions(
@@ -571,16 +611,53 @@ def _run_kt_builder_action(
             "LC_CTYPE": "en_US.UTF-8",  # For Java source files
             "REPOSITORY_NAME": _utils.builder_workspace_name(ctx),
         },
+        toolchain = None,
     )
 
 # MAIN ACTIONS #########################################################################################################
 
-def kt_jvm_produce_jar_actions(ctx, rule_kind):
+def kt_jvm_produce_jar_actions(ctx, rule_kind, extra_resources = {}):
+    """Setup The actions to compile a jar and if any resources or resource_jars were provided to merge these in with the
+    compilation output.
+
+    Returns:
+        see `kt_jvm_compile_action`.
+    """
+
+    toolchains = _compiler_toolchains(ctx)
+    associates = _associate_utils.get_associates(ctx)
+    dep_infos = get_kt_dep_infos(
+        toolchains,
+        associates.targets,
+        deps = ctx.attr.deps,
+    )
+
+    outputs = struct(
+        jar = ctx.outputs.jar,
+        srcjar = ctx.outputs.srcjar,
+    )
+
+    # Setup the compile action.
+    return kt_jvm_produce_output_jar_actions(
+        ctx,
+        rule_kind = rule_kind,
+        compile_deps = _jvm_deps(ctx, dep_infos, ctx.attr.runtime_deps),
+        outputs = outputs,
+        extra_resources = extra_resources,
+    )
+
+def kt_jvm_produce_output_jar_actions(
+        ctx,
+        rule_kind,
+        compile_deps,
+        outputs,
+        extra_resources = {}):
     """This macro sets up a compile action for a Kotlin jar.
 
     Args:
         ctx: Invoking rule ctx, used for attr, actions, and label.
         rule_kind: The rule kind --e.g., `kt_jvm_library`.
+        compile_deps: The rule kind --e.g., `kt_jvm_library`.
     Returns:
         A struct containing the providers JavaInfo (`java`) and `kt` (KtJvmInfo). This struct is not intended to be
         used as a legacy provider -- rather the caller should transform the result.
@@ -588,14 +665,6 @@ def kt_jvm_produce_jar_actions(ctx, rule_kind):
     toolchains = _compiler_toolchains(ctx)
     srcs = _partitioned_srcs(ctx.files.srcs)
     associates = _associate_utils.get_associates(ctx)
-    compile_deps = _jvm_deps(
-        ctx,
-        toolchains,
-        associates.targets,
-        deps = ctx.attr.deps,
-        runtime_deps = ctx.attr.runtime_deps,
-    )
-
     annotation_processors = _plugin_mappers.targets_to_annotation_processors(ctx.attr.plugins + ctx.attr.deps)
     ksp_annotation_processors = _plugin_mappers.targets_to_ksp_annotation_processors(ctx.attr.plugins + ctx.attr.deps)
     transitive_runtime_jars = _plugin_mappers.targets_to_transitive_runtime_jars(ctx.attr.plugins + ctx.attr.deps)
@@ -632,12 +701,12 @@ def kt_jvm_produce_jar_actions(ctx, rule_kind):
     annotation_processing = outputs_struct.annotation_processing
 
     # If this rule has any resources declared setup a zipper action to turn them into a jar.
-    if len(ctx.files.resources) > 0:
-        output_jars.append(_build_resourcejar_action(ctx))
+    if len(ctx.files.resources) + len(extra_resources) > 0:
+        output_jars.append(_build_resourcejar_action(ctx, extra_resources))
     output_jars.extend(ctx.files.resource_jars)
 
     # Merge outputs into final runtime jar.
-    output_jar = ctx.actions.declare_file(ctx.label.name + ".jar")
+    output_jar = outputs.jar
     _fold_jars_action(
         ctx,
         rule_kind = rule_kind,
@@ -649,7 +718,7 @@ def kt_jvm_produce_jar_actions(ctx, rule_kind):
 
     source_jar = java_common.pack_sources(
         ctx.actions,
-        output_source_jar = ctx.outputs.srcjar,
+        output_source_jar = outputs.srcjar,
         sources = srcs.kt + srcs.java,
         source_jars = srcs.src_jars + generated_src_jars,
         java_toolchain = toolchains.java,
@@ -986,3 +1055,10 @@ def export_only_providers(ctx, actions, attr, outputs):
             extensions = ["kt", "java"],
         ),
     )
+
+#
+# Exposed for kt_android_* rules
+#
+jvm_deps_exposed = _jvm_deps
+compiler_friends_exposed = _compiler_friends
+compiler_toolchains_exposed = _compiler_toolchains
