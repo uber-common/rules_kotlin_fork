@@ -17,3 +17,15 @@ try-import %workspace%/bit-ignore.bazelrc
 
 # User-specific .bazelrc
 try-import %workspace%/user.bazelrc
+
+# Expose (not really) experimental Android providers need by rules_android-
+# AndroidLibraryResourceClassJarProvider, AndroidIdeInfo, ...
+# The following common and build flags are required for the
+# migration to rules_android alpha
+common \
+  --experimental_enable_android_migration_apis \
+  --experimental_google_legacy_api \
+  --incompatible_java_common_parameters
+build \
+  --android_databinding_use_v3_4_args \
+  --experimental_android_databinding_v2

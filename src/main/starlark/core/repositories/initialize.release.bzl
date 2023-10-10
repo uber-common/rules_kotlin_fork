@@ -92,16 +92,21 @@ def kotlin_repositories(
         sha256 = versions.KOTLINX_SERIALIZATION_JSON_JVM.sha256,
         urls = [url.format(version = versions.KOTLINX_SERIALIZATION_JSON_JVM.version) for url in versions.KOTLINX_SERIALIZATION_JSON_JVM.url_templates],
     )
-
-    if is_bzlmod:
-        return
-
+    
     maybe(
         http_archive,
         name = "rules_android",
-        sha256 = versions.ANDROID.SHA,
-        strip_prefix = "rules_android-%s" % versions.ANDROID.VERSION,
-        urls = versions.ANDROID.URLS,
+        sha256 = versions.ANDROID.sha256,
+        urls = [url.format(version = versions.ANDROID.version) for url in versions.ANDROID.url_templates],
+    )
+
+    if is_bzlmod:
+        return
+    
+    versions.use_repository(
+        name = "rules_python",
+        rule = http_archive,
+        version = versions.RULES_PYTHON,
     )
 
     versions.use_repository(
