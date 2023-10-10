@@ -606,3 +606,10 @@ kt_jvm_library(
     implementation = _kt_ksp_plugin_impl,
     provides = [_KspPluginInfo],
 )
+
+#
+# Exposed for kt_android_* rules.
+#
+lib_common_attr_exposed = _lib_common_attr
+runnable_common_attr_exposed = _runnable_common_attr
+common_outputs_exposed = _common_outputs
