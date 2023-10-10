@@ -70,10 +70,12 @@ versions = struct(
         ],
         sha256 = "fc27b08cadc061a4a989af01cbeccb613feef1995f4aad68f2be0f886a3ee251",
     ),
-    ANDROID = struct(
-        VERSION = "0.1.1",
-        SHA = "cd06d15dd8bb59926e4d65f9003bfc20f9da4b2519985c27e190cddc8b7a7806",
-        URLS = ["https://github.com/bazelbuild/rules_android/archive/v%s.zip" % "0.1.1"],
+    ANDROID = version(
+        version = "a5e11f139ae25d93832e2604e1588bc97708d7e8",
+        url_templates = [
+            "https://github.com/Bencodes/rules_android/archive/{version}.tar.gz",
+        ],
+        sha256 = "5eb59039c1a591cb6d72ba01c5c33adf66fc7afca8dfcac1e4107829416b0929",
     ),
     # To update: https://github.com/bazelbuild/bazel-toolchains#latest-bazel-and-latest-ubuntu-1604-container
     BAZELCI_RULES = struct(
