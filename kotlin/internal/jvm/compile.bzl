@@ -708,6 +708,7 @@ def kt_jvm_produce_output_jar_actions(
                     class_jar = output_jar,
                     ijar = compile_jar,
                     source_jars = [source_jar],
+                    generated_src_jars = generated_src_jars,
                 )],
             ),
             transitive_compile_time_jars = java_info.transitive_compile_time_jars,
