@@ -33,6 +33,7 @@ def kt_configure():
         name = "kotlin_rules_maven",
         fetch_sources = True,
         artifacts = [
+            "com.google.code.gson:gson:2.10.1",
             "com.google.code.findbugs:jsr305:3.0.2",
             "junit:junit:4.13-beta-3",
             "com.google.protobuf:protobuf-java:3.6.0",
