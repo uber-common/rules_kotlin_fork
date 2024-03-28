@@ -920,6 +920,7 @@ def _run_kt_java_builder_actions(
     ksp_generated_java_src_jars = generated_ksp_src_jars and is_ksp_processor_generating_java(ctx.attr.plugins)
     if srcs.java or generated_kapt_src_jars or srcs.src_jars or ksp_generated_java_src_jars:
         javac_opts = javac_options_to_flags(ctx.attr.javac_opts[JavacOptions] if ctx.attr.javac_opts else toolchains.kt.javac_options)
+        javac_opts.extend(ctx.attr.experimental_javac_opts_extras)
 
         # Kotlin takes care of annotation processing. Note that JavaBuilder "discovers"
         # annotation processors in `deps` also.
