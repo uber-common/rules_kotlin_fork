@@ -248,6 +248,11 @@ _common_attr = utils.add_dicts(
             providers = [_JavacOptions],
             mandatory = False,
         ),
+        "experimental_javac_opts_extras": attr.string_list(
+            doc = """Additional Javac options to be used for custom, package-specific options.""",
+            default = [],
+            mandatory = False,
+        ),
         "ksp_opts": attr.string_dict(
             doc = """KSP options to be used when compiling this target.""",
             default = {},
