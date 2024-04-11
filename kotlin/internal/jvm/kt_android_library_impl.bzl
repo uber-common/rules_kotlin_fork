@@ -25,7 +25,7 @@ load(
 )
 load("@rules_android//rules:java.bzl", _java = "java")
 load("@rules_android//rules:processing_pipeline.bzl", _ProviderInfo = "ProviderInfo", _processing_pipeline = "processing_pipeline")
-load("@rules_android//rules/android_library:impl.bzl", _BASE_PROCESSORS = "PROCESSORS", _finalize = "finalize")
+load("@rules_android//rules/android_library:impl.bzl", _BASE_PROCESSORS = "PROCESSORS", _android_library_finalize = "finalize")
 load("@rules_android//rules:utils.bzl", _get_android_sdk = "get_android_sdk", _utils = "utils")
 
 def _process_jvm(ctx, resources_ctx, **unused_sub_ctxs):
@@ -39,11 +39,25 @@ def _process_jvm(ctx, resources_ctx, **unused_sub_ctxs):
         name = "jvm_ctx",
         value = struct(
             java_info = providers.java,
+            kt_info = providers.kt,
             providers = [
                 providers.kt,
                 providers.java,
             ],
         ),
+    )
+
+def _finalize(ctx, jvm_ctx, **unused_ctxs):
+    # Call into rules_android for it's finalization logic
+    android_struct = _android_library_finalize(ctx = ctx, jvm_ctx = jvm_ctx, **unused_ctxs)
+
+    # Mirror the resulting provider but stick the legacy `kt` provider into the
+    # rule result so that Intellij knows to treat our KT targets as Kotlin.
+    return struct(
+        kt = jvm_ctx.kt_info,
+        android = android_struct.android,
+        java = android_struct.java,
+        providers = android_struct.providers,
     )
 
 PROCESSORS = _processing_pipeline.replace(
