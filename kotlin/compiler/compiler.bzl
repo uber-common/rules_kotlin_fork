@@ -122,6 +122,6 @@ def kt_configure_compiler():
         )
         for art in [
             "test-js",
-            "stdlib-js",
+            # "stdlib-js",
         ]
     ]
