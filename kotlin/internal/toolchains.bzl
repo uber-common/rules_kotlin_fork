@@ -204,7 +204,7 @@ _kt_toolchain = rule(
         ),
         "js_stdlibs": attr.label_list(
             default = [
-                Label("@" + _KT_COMPILER_REPO + "//:kotlin-stdlib-js"),
+                #                Label("//kotlin/compiler:kotlin-stdlib-js"),
             ],
             providers = [_KtJsInfo],
         ),
