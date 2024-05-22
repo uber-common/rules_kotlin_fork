@@ -418,14 +418,14 @@ class JdepsGenExtension(
     rootBuilder.ruleLabel = targetLabel
 
     val unusedDeps = directDeps.subtract(explicitDeps.keys)
-    unusedDeps.forEach { jarPath ->
+    unusedDeps.sorted().forEach { jarPath ->
       val dependency = Deps.Dependency.newBuilder()
       dependency.kind = Deps.Dependency.Kind.UNUSED
       dependency.path = jarPath
       rootBuilder.addDependency(dependency)
     }
 
-    explicitDeps.forEach { (jarPath, usedClasses) ->
+    explicitDeps.toSortedMap().forEach { (jarPath, usedClasses) ->
       val dependency = Deps.Dependency.newBuilder()
       dependency.kind = Deps.Dependency.Kind.EXPLICIT
       dependency.path = jarPath
@@ -448,7 +448,7 @@ class JdepsGenExtension(
       rootBuilder.addDependency(dependency)
     }
 
-    implicitDeps.keys.subtract(explicitDeps.keys).forEach {
+    implicitDeps.keys.subtract(explicitDeps.keys).sorted().forEach {
       val dependency = Deps.Dependency.newBuilder()
       dependency.kind = Deps.Dependency.Kind.IMPLICIT
       dependency.path = it
