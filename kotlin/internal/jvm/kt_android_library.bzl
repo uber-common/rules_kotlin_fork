@@ -12,24 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 load(
+    "@rules_android//rules/android_library:attrs.bzl",
+    _BASE_ATTRS = "ATTRS",
+)
+load(
+    "@rules_android//rules/android_library:rule.bzl",
+    _make_rule = "make_rule",
+)
+load(
     "//kotlin/internal:defs.bzl",
     _KtJvmInfo = "KtJvmInfo",
     _TOOLCHAIN_TYPE = "TOOLCHAIN_TYPE",
+)
+load(
+    "//kotlin/internal/jvm:jvm.bzl",
+    _lib_common_attr_exposed = "lib_common_attr_exposed",
 )
 load(
     "//kotlin/internal/jvm:kt_android_library_impl.bzl",
     _kt_android_library_impl = "kt_android_library_impl",
 )
 load(
-    "//kotlin/internal/jvm:jvm.bzl",
-    _lib_common_attr_exposed = "lib_common_attr_exposed",
+    "//kotlin/internal/utils:utils.bzl",
+    _utils = "utils",
 )
-load("//kotlin/internal/utils:utils.bzl", _utils = "utils")
-load("@rules_android//rules/android_library:rule.bzl", _make_rule = "make_rule")
-load("@rules_android//rules/android_library:attrs.bzl", _BASE_ATTRS = "ATTRS")
 
 _ATTRS = _utils.add_dicts(_BASE_ATTRS, _lib_common_attr_exposed, {
-    # Any additional custom fields that are needed go here
 })
 
 kt_android_library = _make_rule(
