@@ -12,21 +12,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 load(
+    "@rules_android//rules:java.bzl",
+    _java = "java",
+)
+load(
+    "@rules_android//rules:processing_pipeline.bzl",
+    _ProviderInfo = "ProviderInfo",
+    _processing_pipeline = "processing_pipeline",
+)
+load(
+    "@rules_android//rules:utils.bzl",
+    _get_android_sdk = "get_android_sdk",
+    _utils = "utils",
+)
+load(
+    "@rules_android//rules/android_library:impl.bzl",
+    _BASE_PROCESSORS = "PROCESSORS",
+    _android_library_finalize = "finalize",
+)
+load(
     "//kotlin/internal/jvm:compile.bzl",
     "export_only_providers",
     _compile = "compile",
     _kt_jvm_produce_output_jar_actions = "kt_jvm_produce_output_jar_actions",
 )
-load("@rules_android//rules:java.bzl", _java = "java")
-load("@rules_android//rules:processing_pipeline.bzl", _ProviderInfo = "ProviderInfo", _processing_pipeline = "processing_pipeline")
-load("@rules_android//rules/android_library:impl.bzl", _BASE_PROCESSORS = "PROCESSORS", _android_library_finalize = "finalize")
-load("@rules_android//rules:utils.bzl", _get_android_sdk = "get_android_sdk", _utils = "utils")
+
+def _finalize(ctx, jvm_ctx, **unused_ctxs):
+    # Call into rules_android for it's finalization logic
+    providers = _android_library_finalize(ctx = ctx, jvm_ctx = jvm_ctx, **unused_ctxs)
+
+    # Mirror the resulting provider but stick the legacy `kt` provider into the
+    # rule result so that Intellij knows to treat our KT targets as Kotlin.
+    return struct(
+        kt = jvm_ctx.kt_info,
+        providers = providers,
+    )
 
 def _process_jvm(ctx, resources_ctx, **unused_sub_ctxs):
     """Custom JvmProcessor that handles Kotlin compilation
     """
     r_java = resources_ctx.r_java
-    outputs = struct(jar = ctx.outputs.lib_jar, srcjar = ctx.outputs.lib_src_jar)
+    outputs = struct(jar = ctx.outputs.lib_jar, srcjar = ctx.outputs.lib_src_jar, deploy_jar = None)
     providers = kt_android_produce_jar_actions(ctx, "kt_jvm_library", outputs, r_java)
 
     return _ProviderInfo(
@@ -39,19 +65,6 @@ def _process_jvm(ctx, resources_ctx, **unused_sub_ctxs):
                 providers.java,
             ],
         ),
-    )
-
-def _finalize(ctx, jvm_ctx, **unused_ctxs):
-    # Call into rules_android for it's finalization logic
-    android_struct = _android_library_finalize(ctx = ctx, jvm_ctx = jvm_ctx, **unused_ctxs)
-
-    # Mirror the resulting provider but stick the legacy `kt` provider into the
-    # rule result so that Intellij knows to treat our KT targets as Kotlin.
-    return struct(
-        kt = jvm_ctx.kt_info,
-        android = android_struct.android,
-        java = android_struct.java,
-        providers = android_struct.providers,
     )
 
 PROCESSORS = _processing_pipeline.replace(

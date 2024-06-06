@@ -49,6 +49,10 @@ load(
     "//kotlin/internal/utils:utils.bzl",
     _utils = "utils",
 )
+load(
+    "@bazel_skylib//rules:common_settings.bzl",
+    "BuildSettingInfo",
+)
 
 # UTILITY ##############################################################################################################
 def find_java_toolchain(ctx, target):
