@@ -29,6 +29,10 @@ load(
     _processing_pipeline = "processing_pipeline",
 )
 load(
+    "@rules_android//rules:providers.bzl",
+    "AndroidFilteredJdepsInfo",
+)
+load(
     "@rules_android//rules:resources.bzl",
     _resources = "resources",
 )
@@ -42,11 +46,13 @@ load(
 load(
     "@rules_android//rules/android_local_test:impl.bzl",
     _BASE_PROCESSORS = "PROCESSORS",
+    _filter_jdeps = "filter_jdeps",
     _finalize = "finalize",
 )
 load(
     "//kotlin/internal:defs.bzl",
     _JAVA_RUNTIME_TOOLCHAIN_TYPE = "JAVA_RUNTIME_TOOLCHAIN_TYPE",
+    _TOOLCHAIN_TYPE = "TOOLCHAIN_TYPE",
 )
 load(
     "//kotlin/internal/jvm:compile.bzl",
@@ -97,56 +103,62 @@ def _process_resources(ctx, java_package, manifest_ctx, **_unused_sub_ctxs):
 def _process_jvm(ctx, resources_ctx, **unused_sub_ctxs):
     """Custom JvmProcessor that handles Kotlin compilation
     """
+    _compile.verify_associates_not_duplicated_in_deps(deps = getattr(ctx.attr, "deps", []), associates = getattr(ctx.attr, "associates", []))
+
     outputs = struct(jar = ctx.outputs.jar, srcjar = ctx.actions.declare_file(ctx.label.name + "-src.jar"))
 
-    deps = getattr(ctx.attr, "deps", [])
-    associates = getattr(ctx.attr, "associates", [])
-    runtime_deps = getattr(ctx.attr, "runtime_deps", [])
-    _compile.verify_associates_not_duplicated_in_deps(deps = deps, associates = associates)
-
-    compile_deps = _compile.jvm_deps(
-        ctx,
-        toolchains = _compile.compiler_toolchains(ctx),
-        deps = (
-            [_get_android_sdk_jar(ctx)] +
-            [_compile.java_info(_get_android_toolchain(ctx).testsupport)] +
-            ([resources_ctx.r_java] if resources_ctx.r_java else []) +
-            [_compile.java_info(d) for d in associates] +
-            [_compile.java_info(d) for d in deps]
-        ),
-        associates = [_compile.java_info(d) for d in associates],
-        runtime_deps = [_compile.java_info(d) for d in runtime_deps],
-    )
-
-    # Setup the compile action.
-    providers = _kt_jvm_produce_output_jar_actions(
-        ctx,
-        rule_kind = "kt_jvm_test",
-        compile_deps = compile_deps,
-        outputs = outputs,
-    )
-    java_info = java_common.add_constraints(providers.java, "android")
-
-    provider_deps = (
+    deps = (
+        [_get_android_toolchain(ctx).testsupport] +
         ctx.attr._implicit_classpath +
-        associates +
-        deps +
-        [_get_android_toolchain(ctx).testsupport]
+        getattr(ctx.attr, "associates", []) +
+        getattr(ctx.attr, "deps", [])
     )
 
     if ctx.configuration.coverage_enabled:
-        provider_deps.append(_get_android_toolchain(ctx).jacocorunner)
+        deps.append(ctx.toolchains[_TOOLCHAIN_TYPE].jacocorunner)
         java_start_class = JACOCOCO_CLASS
         coverage_start_class = ctx.attr.main_class
     else:
         java_start_class = ctx.attr.main_class
         coverage_start_class = None
 
+    # Setup the compile action.
+    providers = _kt_jvm_produce_output_jar_actions(
+        ctx,
+        rule_kind = "kt_jvm_test",
+        compile_deps = _compile.jvm_deps(
+            ctx,
+            toolchains = _compile.compiler_toolchains(ctx),
+            deps = (
+                [
+                    JavaInfo(
+                        output_jar = _get_android_sdk(ctx).android_jar,
+                        compile_jar = _get_android_sdk(ctx).android_jar,
+                        # The android_jar must not be compiled into the test, it
+                        # will bloat the Jar with no benefit.
+                        neverlink = True,
+                    ),
+                ] +
+                ([resources_ctx.r_java] if resources_ctx.r_java else []) +
+                _utils.collect_providers(JavaInfo, deps)
+            ),
+            associates = [_compile.java_info(d) for d in getattr(ctx.attr, "associates", [])],
+            runtime_deps = [_compile.java_info(d) for d in getattr(ctx.attr, "runtime_deps", [])],
+        ),
+        outputs = outputs,
+    )
+    java_info = java_common.add_constraints(providers.java, "android")
+
     # Create test run action
-    runfiles = depset(
-        [resources_ctx.class_jar] + [_get_android_sdk(ctx).android_jar, ctx.file.robolectric_properties_file],
-        transitive = [providers.java.transitive_runtime_jars],
-    ).to_list()
+    providers = [providers.kt, java_info]
+    runfiles = []
+
+    # Create a filtered jdeps with no resources jar. See b/129011477 for more context.
+    if java_info.outputs.jdeps != None:
+        filtered_jdeps = ctx.actions.declare_file(ctx.label.name + ".filtered.jdeps")
+        _filter_jdeps(ctx, java_info.outputs.jdeps, filtered_jdeps, _utils.only(resources_ctx.r_java.compile_jars.to_list()))
+        providers.append(AndroidFilteredJdepsInfo(jdeps = filtered_jdeps))
+        runfiles.append(filtered_jdeps)
 
     # Append the security manager override
     jvm_flags = []
@@ -158,20 +170,14 @@ def _process_jvm(ctx, resources_ctx, **unused_sub_ctxs):
         name = "jvm_ctx",
         value = struct(
             java_info = java_info,
-            providers = [
-                providers.kt,
-                java_info,
-            ],
-            deps = provider_deps,
+            providers = providers,
+            deps = deps,
             java_start_class = java_start_class,
             coverage_start_class = coverage_start_class,
             android_properties_file = ctx.file.robolectric_properties_file.short_path,
             additional_jvm_flags = jvm_flags,
         ),
-        runfiles = ctx.runfiles(
-            files = runfiles,
-            collect_default = True,
-        ),
+        runfiles = ctx.runfiles(files = runfiles),
     )
 
 PROCESSORS = _processing_pipeline.replace(
@@ -200,20 +206,3 @@ def kt_android_local_test_impl(ctx):
 def _get_android_sdk_jar(ctx):
     android_jar = _get_android_sdk(ctx).android_jar
     return JavaInfo(output_jar = android_jar, compile_jar = android_jar, neverlink = True)
-
-def _get_android_resource_class_jars(targets):
-    """Encapsulates compiler dependency metadata."""
-
-    android_compile_dependencies = []
-
-    # Collect R.class jar files from direct dependencies
-    for d in targets:
-        if AndroidLibraryResourceClassJarProvider in d:
-            jars = d[AndroidLibraryResourceClassJarProvider].jars
-            if jars:
-                android_compile_dependencies.extend([
-                    JavaInfo(output_jar = jar, compile_jar = jar, neverlink = True)
-                    for jar in _utils.list_or_depset_to_list(jars)
-                ])
-
-    return android_compile_dependencies
