@@ -42,6 +42,9 @@ load(
 
 _ATTRS = _utils.add_dicts(_BASE_ATTRS, _runnable_common_attr_exposed, {
     "main_class": attr.string(default = "com.google.testing.junit.runner.BazelTestRunner"),
+    "jacocorunner": attr.label(
+        default = Label("@bazel_tools//tools/jdk:JacocoCoverage"),
+    ),
 })
 
 kt_android_local_test = _make_rule(
