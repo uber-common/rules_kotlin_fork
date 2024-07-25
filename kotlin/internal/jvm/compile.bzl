@@ -314,6 +314,7 @@ def _fold_jars_action(ctx, rule_kind, toolchains, output_jar, input_jars, action
             "" if not action_type else " (%s)" % action_type,
             len(input_jars),
         ),
+        toolchain = None,
     )
 
 def _resourcejar_args_action(ctx, extra_resources = {}):
