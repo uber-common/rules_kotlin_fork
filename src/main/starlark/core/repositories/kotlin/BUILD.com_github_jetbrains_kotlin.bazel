@@ -136,7 +136,7 @@ kt_jvm_import(
     )
     for art in [
         "test-js",
-        "stdlib-js",
+        #"stdlib-js",
     ]
 ]
 
