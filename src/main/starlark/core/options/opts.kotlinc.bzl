@@ -76,14 +76,6 @@ _KOPTS_ALL = {
         value_to_flag = {
             True: ["-Xcontext-receivers"],
         },
-    "x_allow_unstable_dependencies": struct(
-        args = dict(
-            default = False,
-            doc = "Suppress errors when testing experimental libraries"),
-        type = attr.bool,
-        value_to_flag = {
-            True: ["-Xallow-unstable-dependencies"]
-        }
     ),
     "x_suppress_version_warnings": struct(
         flag = "-Xsuppress-version-warnings",
