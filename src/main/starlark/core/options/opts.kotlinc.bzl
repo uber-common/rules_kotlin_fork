@@ -76,6 +76,7 @@ _KOPTS_ALL = {
         value_to_flag = {
             True: ["-Xcontext-receivers"],
         },
+    ),
     "x_allow_unstable_dependencies": struct(
         args = dict(
             default = False,
