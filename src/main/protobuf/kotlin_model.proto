@@ -129,6 +129,8 @@ message JvmCompilationTask {
     string generated_class_jar = 7;
     // Source jar containing the generated KSP sources.
     string generated_ksp_src_jar = 8;
+    // Uninstrumented jar
+    string uninstrumented_jar = 9;
   }
 
   message Inputs {

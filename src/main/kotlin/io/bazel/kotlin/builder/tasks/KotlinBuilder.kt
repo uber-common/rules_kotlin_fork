@@ -88,6 +88,7 @@ class KotlinBuilder @Inject internal constructor(
       REDUCED_CLASSPATH_MODE("--reduced_classpath_mode"),
       INSTRUMENT_COVERAGE("--instrument_coverage"),
       KSP_GENERATED_JAVA_SRCJAR("--ksp_generated_java_srcjar"),
+      UNINSTRMENTED_JAR("--uninstrumented_jar"),
       KSP_OPTS("--ksp_opts"),
       TRACK_CLASS_USAGE("--track_class_usage"),
       TRACK_RESOURCE_USAGE("--track_resource_usage"),
@@ -247,6 +248,9 @@ class KotlinBuilder @Inject internal constructor(
         }
         argMap.optionalSingle(KotlinBuilderFlags.KSP_GENERATED_JAVA_SRCJAR)?.let {
           generatedKspSrcJar = it
+        }
+        argMap.optionalSingle(KotlinBuilderFlags.UNINSTRMENTED_JAR)?.let {
+          uninstrumentedJar = it
         }
       }
 

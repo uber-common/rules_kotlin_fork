@@ -12,7 +12,21 @@ import java.nio.file.Paths
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 
-internal fun JvmCompilationTask.createCoverageInstrumentedJar() {
+internal fun JvmCompilationTask.createCoverageInstrumentedJar(
+) {
+  if (outputs.uninstrumentedJar.isNotEmpty()) {
+    JarCreator(
+      path = Paths.get(outputs.uninstrumentedJar),
+      normalize = true,
+      verbose = false
+    ).also {
+      it.addDirectory(Paths.get(directories.classes))
+      it.addDirectory(Paths.get(directories.javaClasses))
+      it.addDirectory(Paths.get(directories.generatedClasses))
+      it.setJarOwner(info.label, info.bazelRuleKind)
+      it.execute()
+    }
+  }
   val instrumentedClassesDirectory = Paths.get(directories.coverageMetadataClasses)
   Files.createDirectories(instrumentedClassesDirectory)
 
