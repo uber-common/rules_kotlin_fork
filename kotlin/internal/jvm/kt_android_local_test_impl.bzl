@@ -130,8 +130,8 @@ def _process_jvm(ctx, resources_ctx, **unused_sub_ctxs):
             ctx,
             toolchains = _compile.compiler_toolchains(ctx),
             deps = (
-                _utils.collect_providers(JavaInfo, deps) +
                 ([resources_ctx.r_java] if resources_ctx.r_java else []) +
+                _utils.collect_providers(JavaInfo, deps) +
                 [
                     JavaInfo(
                         output_jar = _get_android_sdk(ctx).android_jar,
