@@ -130,8 +130,6 @@ def _process_jvm(ctx, resources_ctx, **unused_sub_ctxs):
             ctx,
             toolchains = _compile.compiler_toolchains(ctx),
             deps = (
-                _utils.collect_providers(JavaInfo, deps) +
-                ([resources_ctx.r_java] if resources_ctx.r_java else []) +
                 [
                     JavaInfo(
                         output_jar = _get_android_sdk(ctx).android_jar,
@@ -140,7 +138,9 @@ def _process_jvm(ctx, resources_ctx, **unused_sub_ctxs):
                         # will bloat the Jar with no benefit.
                         neverlink = True,
                     ),
-                ]
+                ] +
+                ([resources_ctx.r_java] if resources_ctx.r_java else []) +
+                _utils.collect_providers(JavaInfo, deps)
             ),
             associates = [_compile.java_info(d) for d in getattr(ctx.attr, "associates", [])],
             runtime_deps = [_compile.java_info(d) for d in getattr(ctx.attr, "runtime_deps", [])],
