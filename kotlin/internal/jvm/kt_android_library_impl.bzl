@@ -28,7 +28,7 @@ load(
 load(
     "@rules_android//rules/android_library:impl.bzl",
     _BASE_PROCESSORS = "PROCESSORS",
-    _finalize = "finalize",
+    _android_library_finalize = "finalize",
 )
 load(
     "//kotlin/internal/jvm:compile.bzl",
@@ -36,6 +36,17 @@ load(
     _compile = "compile",
     _kt_jvm_produce_output_jar_actions = "kt_jvm_produce_output_jar_actions",
 )
+
+def _finalize(ctx, jvm_ctx, **unused_ctxs):
+    # Call into rules_android for it's finalization logic
+    providers = _android_library_finalize(ctx = ctx, jvm_ctx = jvm_ctx, **unused_ctxs)
+
+    # Mirror the resulting provider but stick the legacy `kt` provider into the
+    # rule result so that Intellij knows to treat our KT targets as Kotlin.
+    return struct(
+        kt = jvm_ctx.kt_info,
+        providers = providers,
+    )
 
 def _process_jvm(ctx, resources_ctx, **unused_sub_ctxs):
     """Custom JvmProcessor that handles Kotlin compilation
