@@ -97,6 +97,24 @@ class KotlinToolchain private constructor(
       ).toPath()
     }
 
+    private val KOTLINX_SERIALIZATION_CORE_JVM by lazy {
+      BazelRunFiles.resolveVerifiedFromProperty(
+        "@com_github_jetbrains_kotlinx...serialization-core-jvm",
+      ).toPath()
+    }
+
+    private val KOTLINX_SERIALIZATION_JSON by lazy {
+      BazelRunFiles.resolveVerifiedFromProperty(
+        "@com_github_jetbrains_kotlinx...serialization-json",
+      ).toPath()
+    }
+
+    private val KOTLINX_SERIALIZATION_JSON_JVM by lazy {
+      BazelRunFiles.resolveVerifiedFromProperty(
+        "@com_github_jetbrains_kotlinx...serialization-json-jvm",
+      ).toPath()
+    }
+
     private val JAVA_HOME by lazy {
       FileSystems.getDefault().getPath(System.getProperty("java.home")).let { path ->
         path.takeIf { !it.endsWith(Paths.get("jre")) } ?: path.parent
@@ -119,6 +137,9 @@ class KotlinToolchain private constructor(
         KAPT_PLUGIN.verified().absoluteFile,
         KSP_SYMBOL_PROCESSING_API.toFile(),
         KSP_SYMBOL_PROCESSING_CMDLINE.toFile(),
+        KOTLINX_SERIALIZATION_CORE_JVM.toFile(),
+        KOTLINX_SERIALIZATION_JSON.toFile(),
+        KOTLINX_SERIALIZATION_JSON_JVM.toFile(),
       )
     }
 
@@ -133,9 +154,12 @@ class KotlinToolchain private constructor(
       kaptFile: File,
       kspSymbolProcessingApi: File,
       kspSymbolProcessingCommandLine: File,
+      kotlinxSerializationCoreJvm: File,
+      kotlinxSerializationJson: File,
+      kotlinxSerializationJsonJvm: File,
     ): KotlinToolchain {
       return KotlinToolchain(
-        listOf(
+        baseJars = listOf(
           kotlinc,
           compiler,
           // plugins *must* be preloaded. Not doing so causes class conflicts
@@ -146,6 +170,9 @@ class KotlinToolchain private constructor(
           jdepsGenFile,
           kspSymbolProcessingApi,
           kspSymbolProcessingCommandLine,
+          kotlinxSerializationCoreJvm,
+          kotlinxSerializationJson,
+          kotlinxSerializationJsonJvm,
         ),
         jvmAbiGen = CompilerPlugin(
           jvmAbiGenFile.path,
