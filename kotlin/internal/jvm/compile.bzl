@@ -849,21 +849,25 @@ def _run_kt_java_builder_actions(
         generated_ksp_src_jars.append(ksp_outputs.ksp_generated_class_jar)
 
     java_infos = []
-
     # Build Kotlin
     if has_kt_sources:
         kt_runtime_jar = ctx.actions.declare_file(ctx.label.name + "-kt.jar")
+        outputs = {
+            "output": kt_runtime_jar,
+        }
+        # If coverage is enabled, we need to build the uninstrumented jar as well.
+        if ctx.coverage_instrumented():
+            uninstrumented_jar = ctx.actions.declare_file(ctx.label.name + "-kt-uninstrumented.jar")
+            outputs["uninstrumented_jar"] = uninstrumented_jar
+
         if not "kt_abi_plugin_incompatible" in ctx.attr.tags and toolchains.kt.experimental_use_abi_jars == True:
             kt_compile_jar = ctx.actions.declare_file(ctx.label.name + "-kt.abi.jar")
-            outputs = {
-                "output": kt_runtime_jar,
-                "abi_jar": kt_compile_jar,
-            }
+            outputs["abi_jar"] = kt_compile_jar
         else:
-            kt_compile_jar = kt_runtime_jar
-            outputs = {
-                "output": kt_runtime_jar,
-            }
+            if ctx.coverage_instrumented():
+                kt_compile_jar = uninstrumented_jar
+            else:
+                kt_compile_jar = kt_runtime_jar
 
         kt_jdeps = None
         if toolchains.kt.jvm_emit_jdeps:
@@ -890,6 +894,7 @@ def _run_kt_java_builder_actions(
 
         compile_jars.append(kt_compile_jar)
         output_jars.append(kt_runtime_jar)
+
         if use_javac_annotation_processor or not annotation_processors or not has_kt_sources:
             kt_stubs_for_java.append(JavaInfo(compile_jar = kt_compile_jar, output_jar = kt_runtime_jar, neverlink = True))
 
