@@ -1,6 +1,6 @@
 module(
     name = "rules_kotlin",
-    version = "1.8.1",
+    version = "1.9.6",
     compatibility_level = 1,
     repo_name = "rules_kotlin",
 )
@@ -29,7 +29,6 @@ rules_kotlin_bootstrap_extensions = use_extension(
 )
 use_repo(
     rules_kotlin_bootstrap_extensions,
-    "kt_java_stub_template",
     "released_com_github_google_ksp",
     "released_com_github_jetbrains_kotlin",
 )
