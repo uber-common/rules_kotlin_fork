@@ -95,6 +95,11 @@ def _kotlin_toolchain_impl(ctx):
         empty_jar = ctx.file._empty_jar,
         empty_jdeps = ctx.file._empty_jdeps,
         jacocorunner = ctx.attr.jacocorunner,
+        experimental_kover_enabled = ctx.attr.experimental_kover_enabled,
+        experimental_kover_agent = ctx.attr.experimental_kover_agent,
+        experimental_kover_exclude = ctx.attr.experimental_kover_exclude,
+        experimental_kover_exclude_annotation = ctx.attr.experimental_kover_exclude_annotation,
+        experimental_kover_exclude_inherited_from = ctx.attr.experimental_kover_exclude_inherited_from,
         experimental_prune_transitive_deps = ctx.attr._experimental_prune_transitive_deps[BuildSettingInfo].value,
     )
 
@@ -293,6 +298,23 @@ _kt_toolchain = rule(
         "jacocorunner": attr.label(
             default = Label("@bazel_tools//tools/jdk:JacocoCoverage"),
         ),
+        "experimental_kover_enabled": attr.bool(
+            doc = """Use kover for code coverage.""",
+            default = False,
+        ),
+        "experimental_kover_agent": attr.label(
+            doc = """Kover agent Jar target used for code coverage, only used if experimental_kover_enabled is true.""",
+            providers = [JavaInfo],
+        ),
+        "experimental_kover_exclude": attr.string_list(
+            doc = """List of exclusions to use when generating kover reports.""",
+        ),
+        "experimental_kover_exclude_annotation": attr.string_list(
+            doc = """List of annotation exclusions to use when generating kover reports.""",
+        ),
+        "experimental_kover_exclude_inherited_from": attr.string_list(
+            doc = """List of annotation exclusions from inherited classes to use when generating kover reports.""",
+        ),
         "_experimental_prune_transitive_deps": attr.label(
             doc = """If enabled, compilation is performed against only direct dependencies.
             Transitive deps required for compilation must be explicitly added. Using
@@ -337,6 +359,11 @@ def define_kt_toolchain(
         experimental_track_resource_usage = None,
         experimental_compile_with_transitive_deps = True,
         experimental_multiplex_workers = None,
+        experimental_kover_enabled = False,
+        experimental_kover_agent = None,
+        experimental_kover_exclude = [],
+        experimental_kover_exclude_annotation = [],
+        experimental_kover_exclude_inherited_from = [],
         javac_options = Label("//kotlin/internal:default_javac_options"),
         kotlinc_options = Label("//kotlin/internal:default_kotlinc_options"),
         jacocorunner = None):
@@ -361,6 +388,11 @@ def define_kt_toolchain(
         experimental_track_class_usage = experimental_track_class_usage,
         experimental_track_resource_usage = experimental_track_resource_usage,
         experimental_compile_with_transitive_deps = experimental_compile_with_transitive_deps,
+        experimental_kover_enabled = experimental_kover_enabled,
+        experimental_kover_agent = experimental_kover_agent,
+        experimental_kover_exclude = experimental_kover_exclude,
+        experimental_kover_exclude_annotation = experimental_kover_exclude_annotation,
+        experimental_kover_exclude_inherited_from = experimental_kover_exclude_inherited_from,
         javac_options = javac_options,
         kotlinc_options = kotlinc_options,
         visibility = ["//visibility:public"],
