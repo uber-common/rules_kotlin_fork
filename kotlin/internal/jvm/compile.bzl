@@ -55,6 +55,9 @@ load(
     "@bazel_skylib//rules:common_settings.bzl",
     "BuildSettingInfo",
 )
+load("//kotlin/internal/jvm:kover.bzl",
+    _is_kover_enabled = "is_kover_enabled"
+)
 
 # UTILITY ##############################################################################################################
 
@@ -525,7 +528,7 @@ def _run_kt_builder_action(
     args.add_all("--source_jars", srcs.src_jars + generated_src_jars, omit_if_empty = True)
     args.add_all("--deps_artifacts", deps_artifacts, omit_if_empty = True)
     args.add_all("--kotlin_friend_paths", associates.jars, map_each = _associate_utils.flatten_jars)
-    args.add("--instrument_coverage", ctx.coverage_instrumented())
+    args.add("--instrument_coverage", ctx.coverage_instrumented() and not _is_kover_enabled(ctx))
     args.add("--track_class_usage", toolchains.kt.experimental_track_class_usage)
     args.add("--track_resource_usage", toolchains.kt.experimental_track_resource_usage)
     if ksp_opts:
