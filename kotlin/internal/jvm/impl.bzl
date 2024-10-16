@@ -31,6 +31,13 @@ load(
     "//kotlin/internal/utils:utils.bzl",
     _utils = "utils",
 )
+load("//kotlin/internal/jvm:kover.bzl",
+    _is_kover_enabled = "is_kover_enabled",
+    _get_kover_agent_files = "get_kover_agent_file",
+    _create_kover_agent_actions = "create_kover_agent_actions",
+    _create_kover_metadata_action = "create_kover_metadata_action",
+    _get_kover_jvm_flags = "get_kover_jvm_flags",
+)
 load("//third_party:jarjar.bzl", "jarjar_action")
 
 # borrowed from skylib to avoid adding that to the release.
@@ -78,7 +85,7 @@ def _write_launcher_action(ctx, rjars, main_class, jvm_flags):
     if getattr(java_runtime, "version", 0) >= 17:
         jvm_flags = jvm_flags + " -Djava.security.manager=allow"
 
-    if ctx.configuration.coverage_enabled:
+    if ctx.configuration.coverage_enabled and not _is_kover_enabled(ctx):
         jacocorunner = ctx.toolchains[_TOOLCHAIN_TYPE].jacocorunner
         classpath = ctx.configuration.host_path_separator.join(
             ["${RUNPATH}%s" % (j.short_path) for j in rjars.to_list() + jacocorunner.files.to_list()],
@@ -271,12 +278,30 @@ _SPLIT_STRINGS = [
 
 def kt_jvm_junit_test_impl(ctx):
     providers = _kt_jvm_produce_jar_actions(ctx, "kt_jvm_test")
-    runtime_jars = depset(ctx.files._bazel_test_runner, transitive = [providers.java.transitive_runtime_jars])
 
     coverage_runfiles = []
+    coverage_inputs = []
+    coverage_jvm_flags = []
+
     if ctx.configuration.coverage_enabled:
-        jacocorunner = ctx.toolchains[_TOOLCHAIN_TYPE].jacocorunner
-        coverage_runfiles = jacocorunner.files.to_list()
+        if _is_kover_enabled(ctx):
+            kover_agent_files = _get_kover_agent_files(ctx)
+            kover_output_file, kover_args_file = _create_kover_agent_actions(ctx, ctx.attr.name)
+            kover_output_metadata_file = _create_kover_metadata_action(
+                ctx,
+                ctx.attr.name,
+                ctx.attr.deps + ctx.attr.associates,
+                kover_output_file
+            )
+            flags = _get_kover_jvm_flags(kover_agent_files, kover_args_file)
+
+            # add Kover agent jvm_flag, inputs and outputs
+            coverage_jvm_flags = [flags]
+            coverage_inputs = [depset(kover_agent_files)]
+            coverage_runfiles = [kover_args_file, kover_output_metadata_file]
+        else:
+            jacocorunner = ctx.toolchains[_TOOLCHAIN_TYPE].jacocorunner
+            coverage_runfiles = jacocorunner.files.to_list()
 
     test_class = ctx.attr.test_class
 
@@ -294,8 +319,13 @@ def kt_jvm_junit_test_impl(ctx):
     jvm_flags = []
     if hasattr(ctx.fragments.java, "default_jvm_opts"):
         jvm_flags = ctx.fragments.java.default_jvm_opts
+    jvm_flags.extend(coverage_jvm_flags + ctx.attr.jvm_flags)
 
-    jvm_flags.extend(ctx.attr.jvm_flags)
+    runtime_jars = depset(
+        ctx.files._bazel_test_runner,
+        transitive = [providers.java.transitive_runtime_jars] + coverage_inputs
+    )
+
     coverage_metadata = _write_launcher_action(
         ctx,
         runtime_jars,
