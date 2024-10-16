@@ -88,6 +88,15 @@ _KOPTS_ALL = {
             True: ["-Xsuppress-version-warnings"],
         },
     ),
+    "x_allow_unstable_dependencies": struct(
+        args = dict(
+            default = False,
+            doc = "Suppress errors when testing experimental libraries"),
+        type = attr.bool,
+        value_to_flag = {
+            True: ["-Xallow-unstable-dependencies"]
+        }
+    ),
     "x_inline_classes": struct(
         flag = "-Xinline-classes",
         args = dict(

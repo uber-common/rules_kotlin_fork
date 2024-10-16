@@ -27,6 +27,7 @@ import io.bazel.kotlin.builder.utils.IS_JVM_SOURCE_FILE
 import io.bazel.kotlin.builder.utils.bazelRuleKind
 import io.bazel.kotlin.builder.utils.jars.JarCreator
 import io.bazel.kotlin.builder.utils.jars.JarHelper.Companion.MANIFEST_DIR
+import io.bazel.kotlin.builder.utils.jars.JarHelper.Companion.SERVICES_DIR
 import io.bazel.kotlin.builder.utils.jars.SourceJarExtractor
 import io.bazel.kotlin.builder.utils.partitionJvmSources
 import io.bazel.kotlin.model.JvmCompilationTask
@@ -47,6 +48,8 @@ import java.util.stream.Stream
 import kotlin.io.path.exists
 
 private const val SOURCE_JARS_DIR = "_srcjars"
+private const val API_VERSION_ARG = "-api-version"
+private const val LANGUAGE_VERSION_ARG = "-language-version"
 
 fun JvmCompilationTask.codeGenArgs(): CompilationArgs = CompilationArgs()
   .absolutePaths(info.friendPathsList) {
@@ -55,7 +58,7 @@ fun JvmCompilationTask.codeGenArgs(): CompilationArgs = CompilationArgs()
   .flag("-d", directories.classes)
   .values(info.passthroughFlagsList)
 
-fun JvmCompilationTask.baseArgs(): CompilationArgs {
+fun JvmCompilationTask.baseArgs(overrides: Map<String, String> = emptyMap()): CompilationArgs {
   val classpath = when (info.reducedClasspathMode) {
     "KOTLINBUILDER_REDUCED" -> {
       val transitiveDepsForCompile = mutableSetOf<String>()
@@ -82,8 +85,8 @@ fun JvmCompilationTask.baseArgs(): CompilationArgs {
       it.map(Path::toString)
         .joinToString(File.pathSeparator)
     }
-    .flag("-api-version", info.toolchainInfo.common.apiVersion)
-    .flag("-language-version", info.toolchainInfo.common.languageVersion)
+    .flag(API_VERSION_ARG, overrides[API_VERSION_ARG] ?: info.toolchainInfo.common.apiVersion)
+    .flag(LANGUAGE_VERSION_ARG, overrides[LANGUAGE_VERSION_ARG] ?: info.toolchainInfo.common.languageVersion)
     .flag("-jvm-target", info.toolchainInfo.jvm.jvmTarget)
     .flag("-module-name", info.moduleName)
 }
@@ -99,11 +102,13 @@ internal fun JvmCompilationTask.plugins(
 
     val optionTokens = mapOf(
       "{generatedClasses}" to directories.generatedClasses,
+      "{incrementalData}" to directories.incrementalData,
       "{stubs}" to directories.stubs,
       "{temp}" to directories.temp,
       "{generatedSources}" to directories.generatedSources,
-      "{classpath}" to classpath.joinToString(File.pathSeparator),
+      "{apclasspath}" to classpath.joinToString(File.pathSeparator),
     )
+
     options.forEach { opt ->
       val formatted = optionTokens.entries.fold(opt) { formatting, (token, value) ->
         formatting.replace(token, value)
@@ -215,6 +220,10 @@ internal fun JvmCompilationTask.kspArgs(
           flag(pair.first, value)
         }
       }
+
+      info.kspOptsList.forEach { flag ->
+        flag("apoption", flag)
+      }
     }
   }
 }
@@ -227,18 +236,17 @@ internal fun JvmCompilationTask.runPlugins(
   plugins: InternalCompilerPlugins,
   compiler: KotlinToolchain.KotlincInvoker,
 ): JvmCompilationTask {
-  if (
-    (
-      inputs.processorsList.isEmpty() &&
-        inputs.stubsPluginClasspathList.isEmpty()
-      ) ||
+  if ((
+    inputs.processorsList.isEmpty() &&
+      inputs.stubsPluginClasspathList.isEmpty()
+    ) ||
     inputs.kotlinSourcesList.isEmpty()
   ) {
     return this
   } else {
     if (!outputs.generatedKspSrcJar.isNullOrEmpty()) {
       return runKspPlugin(context, plugins, compiler)
-    } else if (!outputs.generatedClassJar.isNullOrEmpty()) {
+    } else if (!outputs.generatedClassJar.isNullOrEmpty() && this.compileWithKapt) {
       return runKaptPlugin(context, plugins, compiler)
     } else {
       return this
@@ -283,7 +291,11 @@ private fun JvmCompilationTask.runKspPlugin(
   compiler: KotlinToolchain.KotlincInvoker,
 ): JvmCompilationTask {
   return context.execute("Ksp (${inputs.processorsList.joinToString(", ")})") {
-    baseArgs()
+    val overrides = mutableMapOf(
+      API_VERSION_ARG to kspKotlinToolchainVersion(info.toolchainInfo.common.apiVersion),
+      LANGUAGE_VERSION_ARG to kspKotlinToolchainVersion(info.toolchainInfo.common.languageVersion),
+    )
+    baseArgs(overrides)
       .plus(kspArgs(plugins))
       .flag("-d", directories.generatedClasses)
       .values(inputs.kotlinSourcesList)
@@ -302,6 +314,11 @@ private fun JvmCompilationTask.runKspPlugin(
         return@let expandWithGeneratedSources()
       }
   }
+}
+
+private fun kspKotlinToolchainVersion(version: String): String {
+  // KSP doesn't support Kotlin 2.0 yet, so we need to use 1.9
+  return if (version.toFloat() >= 2.0) "1.9" else version
 }
 
 /**
@@ -454,7 +471,7 @@ internal fun JvmCompilationTask.expandWithSourceJarSources(): JvmCompilationTask
     expandWithSources(
       SourceJarExtractor(
         destDir = Paths.get(directories.temp).resolve(SOURCE_JARS_DIR),
-        fileMatcher = { str: String -> IS_JVM_SOURCE_FILE.test(str) || "/$MANIFEST_DIR" in str },
+        fileMatcher = { str: String -> IS_JVM_SOURCE_FILE.test(str) || ("/$MANIFEST_DIR" in str && !("MANIFEST.MF" in str)) || "/$SERVICES_DIR" in str },
       ).also {
         it.jarFiles.addAll(inputs.sourceJarsList.map { p -> Paths.get(p) })
         it.execute()
@@ -516,7 +533,7 @@ internal fun Iterator<String>.copyManifestFilesToGeneratedClasses(
 ): Iterator<String> {
   val result = mutableSetOf<String>()
   this.forEach {
-    if ("/$MANIFEST_DIR" in it) {
+    if ("/$MANIFEST_DIR" in it || "/$SERVICES_DIR" in it) {
       val path = Paths.get(it)
       val srcJarsPath = Paths.get(directories.temp, SOURCE_JARS_DIR)
       if (srcJarsPath.exists()) {

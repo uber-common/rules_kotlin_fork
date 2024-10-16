@@ -87,11 +87,18 @@ def _kotlin_toolchain_impl(ctx):
         experimental_strict_kotlin_deps = ctx.attr.experimental_strict_kotlin_deps,
         experimental_report_unused_deps = ctx.attr.experimental_report_unused_deps,
         experimental_reduce_classpath_mode = ctx.attr.experimental_reduce_classpath_mode,
+        experimental_compile_with_transitive_deps = ctx.attr.experimental_compile_with_transitive_deps,
+        experimental_track_class_usage = ctx.attr.experimental_track_class_usage,
+        experimental_track_resource_usage = ctx.attr.experimental_track_resource_usage,
         javac_options = ctx.attr.javac_options[JavacOptions] if ctx.attr.javac_options else None,
         kotlinc_options = ctx.attr.kotlinc_options[KotlincOptions] if ctx.attr.kotlinc_options else None,
         empty_jar = ctx.file._empty_jar,
         empty_jdeps = ctx.file._empty_jdeps,
         jacocorunner = ctx.attr.jacocorunner,
+        experimental_kover_enabled = ctx.attr.experimental_kover_enabled,
+        experimental_kover_agent = ctx.attr.experimental_kover_agent,
+        experimental_kover_exclude = ctx.attr.experimental_kover_exclude,
+        experimental_kover_exclude_annotation = ctx.attr.experimental_kover_exclude_annotation,
         experimental_prune_transitive_deps = ctx.attr._experimental_prune_transitive_deps[BuildSettingInfo].value,
     )
 
@@ -124,7 +131,7 @@ _kt_toolchain = rule(
         ),
         "language_version": attr.string(
             doc = "this is the -language_version flag [see](https://kotlinlang.org/docs/reference/compatibility.html)",
-            default = "1.9",
+            default = "2.0",
             values = [
                 "1.1",
                 "1.2",
@@ -140,7 +147,7 @@ _kt_toolchain = rule(
         ),
         "api_version": attr.string(
             doc = "this is the -api_version flag [see](https://kotlinlang.org/docs/reference/compatibility.html).",
-            default = "1.9",
+            default = "2.0",
             values = [
                 "1.1",
                 "1.2",
@@ -208,7 +215,7 @@ _kt_toolchain = rule(
         ),
         "js_stdlibs": attr.label_list(
             default = [
-                Label("//kotlin/compiler:kotlin-stdlib-js"),
+                #                Label("//kotlin/compiler:kotlin-stdlib-js"),
             ],
             providers = [_KtJsInfo],
         ),
@@ -247,6 +254,26 @@ _kt_toolchain = rule(
                 "KOTLINBUILDER_REDUCED",
             ],
         ),
+        "experimental_track_class_usage": attr.string(
+            doc = "Whether to track used classes",
+            default = "off",
+            values = [
+                "off",
+                "on",
+            ],
+        ),
+        "experimental_track_resource_usage": attr.string(
+            doc = "Whether to track used resources",
+            default = "off",
+            values = [
+                "off",
+                "on",
+            ],
+        ),
+        "experimental_compile_with_transitive_deps": attr.bool(
+            doc = "Compile with or without transitive dependencies from the classpath",
+            default = True,
+        ),
         "javac_options": attr.label(
             doc = "Compiler options for javac",
             providers = [JavacOptions],
@@ -269,6 +296,20 @@ _kt_toolchain = rule(
         ),
         "jacocorunner": attr.label(
             default = Label("@bazel_tools//tools/jdk:JacocoCoverage"),
+        ),
+        "experimental_kover_enabled": attr.bool(
+            doc = """Use kover for code coverage.""",
+            default = False,
+        ),
+        "experimental_kover_agent": attr.label(
+            doc = """Kover agent Jar target used for code coverage, only used if experimental_kover_enabled is true.""",
+            providers = [JavaInfo],
+        ),
+        "experimental_kover_exclude": attr.string_list(
+            doc = """List of exclusions to use when generating kover reports.""",
+        ),
+        "experimental_kover_exclude_annotation": attr.string_list(
+            doc = """List of annotation exclusions to use when generating kover reports.""",
         ),
         "_experimental_prune_transitive_deps": attr.label(
             doc = """If enabled, compilation is performed against only direct dependencies.
@@ -310,7 +351,14 @@ def define_kt_toolchain(
         experimental_strict_kotlin_deps = None,
         experimental_report_unused_deps = None,
         experimental_reduce_classpath_mode = None,
+        experimental_track_class_usage = None,
+        experimental_track_resource_usage = None,
+        experimental_compile_with_transitive_deps = True,
         experimental_multiplex_workers = None,
+        experimental_kover_enabled = False,
+        experimental_kover_agent = None,
+        experimental_kover_exclude = [],
+        experimental_kover_exclude_annotation = [],
         javac_options = Label("//kotlin/internal:default_javac_options"),
         kotlinc_options = Label("//kotlin/internal:default_kotlinc_options"),
         jacocorunner = None):
@@ -332,6 +380,13 @@ def define_kt_toolchain(
         experimental_strict_kotlin_deps = experimental_strict_kotlin_deps,
         experimental_report_unused_deps = experimental_report_unused_deps,
         experimental_reduce_classpath_mode = experimental_reduce_classpath_mode,
+        experimental_track_class_usage = experimental_track_class_usage,
+        experimental_track_resource_usage = experimental_track_resource_usage,
+        experimental_compile_with_transitive_deps = experimental_compile_with_transitive_deps,
+        experimental_kover_enabled = experimental_kover_enabled,
+        experimental_kover_agent = experimental_kover_agent,
+        experimental_kover_exclude = experimental_kover_exclude,
+        experimental_kover_exclude_annotation = experimental_kover_exclude_annotation,
         javac_options = javac_options,
         kotlinc_options = kotlinc_options,
         visibility = ["//visibility:public"],
