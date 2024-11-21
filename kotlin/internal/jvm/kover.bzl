@@ -154,6 +154,9 @@ def create_kover_metadata_action(
     for exclude_annotation in ctx.toolchains[_TOOLCHAIN_TYPE].experimental_kover_exclude_annotation:
         excludes.extend(["--excludeAnnotation", exclude_annotation])
 
+    for exclude_inherited_from in ctx.toolchains[_TOOLCHAIN_TYPE].experimental_kover_exclude_inherited_from:
+        excludes.extend(["--excludeInheritedFrom", exclude_inherited_from])
+
     ctx.actions.write(kover_output_metadata_file, "\n".join([
         "report",
         kover_output_file.path,

@@ -99,6 +99,7 @@ def _kotlin_toolchain_impl(ctx):
         experimental_kover_agent = ctx.attr.experimental_kover_agent,
         experimental_kover_exclude = ctx.attr.experimental_kover_exclude,
         experimental_kover_exclude_annotation = ctx.attr.experimental_kover_exclude_annotation,
+        experimental_kover_exclude_inherited_from = ctx.attr.experimental_kover_exclude_inherited_from,
         experimental_prune_transitive_deps = ctx.attr._experimental_prune_transitive_deps[BuildSettingInfo].value,
     )
 
@@ -311,6 +312,9 @@ _kt_toolchain = rule(
         "experimental_kover_exclude_annotation": attr.string_list(
             doc = """List of annotation exclusions to use when generating kover reports.""",
         ),
+        "experimental_kover_exclude_inherited_from": attr.string_list(
+            doc = """List of annotation exclusions from inherited classes to use when generating kover reports.""",
+        ),
         "_experimental_prune_transitive_deps": attr.label(
             doc = """If enabled, compilation is performed against only direct dependencies.
             Transitive deps required for compilation must be explicitly added. Using
@@ -359,6 +363,7 @@ def define_kt_toolchain(
         experimental_kover_agent = None,
         experimental_kover_exclude = [],
         experimental_kover_exclude_annotation = [],
+        experimental_kover_exclude_inherited_from = [],
         javac_options = Label("//kotlin/internal:default_javac_options"),
         kotlinc_options = Label("//kotlin/internal:default_kotlinc_options"),
         jacocorunner = None):
@@ -387,6 +392,7 @@ def define_kt_toolchain(
         experimental_kover_agent = experimental_kover_agent,
         experimental_kover_exclude = experimental_kover_exclude,
         experimental_kover_exclude_annotation = experimental_kover_exclude_annotation,
+        experimental_kover_exclude_inherited_from = experimental_kover_exclude_inherited_from,
         javac_options = javac_options,
         kotlinc_options = kotlinc_options,
         visibility = ["//visibility:public"],
