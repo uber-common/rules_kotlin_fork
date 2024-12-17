@@ -116,7 +116,11 @@ class PersistentWorker(
         output = outputLines
           .asSequence()
           .filter { it.isNotBlank() }
-          .filterNot { it.contains("[ksp] loaded provider(s): ") }
+          .filterNot {
+            it.contains("[ksp] loaded provider(s): ") ||
+            it.contains("[ksp] No dependencies reported for generated source") ||
+            it.contains("Please file a bug at https://issuetracker.google.com/issues/new?component=413107")
+          }
           .joinToString("\n")
           .trim()
         exitCode = status.exit
