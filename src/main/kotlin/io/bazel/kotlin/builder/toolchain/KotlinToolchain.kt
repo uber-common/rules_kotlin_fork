@@ -26,6 +26,7 @@ import org.jetbrains.kotlin.preloading.Preloader
 import java.io.File
 import java.io.PrintStream
 import java.lang.reflect.Method
+import java.nio.file.Files
 import java.nio.file.FileSystems
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -103,6 +104,7 @@ class KotlinToolchain private constructor(
         .resolveVerifiedFromProperty(
           "@rules_kotlin..kotlin.compiler.kotlin-reflect",
         ).toPath()
+        .let { if (Files.isSymbolicLink(it)) Files.readSymbolicLink(it) else it }
     }
 
     private val KOTLINX_SERIALIZATION_CORE_JVM by lazy {
